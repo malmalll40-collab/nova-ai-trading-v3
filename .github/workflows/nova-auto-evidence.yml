@@ -1,0 +1,26 @@
+name: NOVA daily read-only evidence tracking
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 17:37 KST, Mon-Fri; scheduled GitHub jobs can be delayed/missed.
+    # Snapshot source freshness (FSC T+1 / KRX) is checked by NOVA itself.
+    - cron: '37 8 * * 1-5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nova-market-evidence
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NOVA_AUTOTRACK_TOKEN: ${{ secrets.NOVA_AUTOTRACK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute NOVA market evidence research (NO orders)
+        run: python .github/scripts/nova_autotrack_ping.py
