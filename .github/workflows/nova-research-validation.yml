@@ -1,0 +1,30 @@
+name: NOVA research validation
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: "."
+      NOVA_OPS_DIAGNOSTICS_ON_START: "0"
+      NOVA_CORE541_EVIDENCE_ENABLED: "0"
+      NOVA_CORE560_AUTO_ENABLED: "0"
+      NOVA_CORE566_AUTO_ENABLED: "0"
+      NOVA_AUTOTRACK_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt pytest httpx
+      - name: Compile sources
+        run: python -m compileall -q -x '/\.git/' .
+      - name: Focused research tests
+        run: python -m pytest -q tests/test_v571_policy.py
+      - name: Regression tests
+        run: python -m pytest -q
