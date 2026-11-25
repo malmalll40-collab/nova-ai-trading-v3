@@ -6,6 +6,8 @@ from datetime import datetime,timezone
 def archive_verified(symbol,bars,report):
     if os.environ.get('NOVA_KIS_ARCHIVE_ENABLED','').lower() not in ('1','true','yes') or backend()=='disabled':return False
     if not report or not report.get('verified') or not report.get('regular_volume_verified') or report.get('verification_basis')!='KIS_REGULAR_MINUTE' or bars.empty:return False
+    # Legacy archives do not preserve cross-endpoint proof; keep it in research evidence only.
+    if (report.get('minute_coverage') or {}).get('zero_proofs'):return False
     day=str(bars.index[-1].date())
     if day!=report.get('latest_date'):return False
     row={k:float(bars.iloc[-1][k]) for k in ('Open','High','Low','Close','Volume')}
@@ -47,6 +49,8 @@ def save_regular(symbol,bars,report):
     if not regular_archive_enabled():return 'DISABLED'
     if report and report.get('archive_reused'):return 'REUSED'
     if not report or not report.get('verified') or report.get('signal_hold') or not report.get('regular_volume_verified') or report.get('verification_basis')!='KIS_REGULAR_MINUTE' or report.get('archive_reused'):return 'NOT_SAVED'
+    # Do not cache a cross-endpoint aggregate in a legacy proof-less archive.
+    if (report.get('minute_coverage') or {}).get('zero_proofs'):return 'NOT_SAVED'
     key=report.get('native_fingerprint');day=report.get('latest_date')
     if not key or bars.empty or str(bars.index[-1].date())!=day:return 'NOT_SAVED'
     row={k:float(bars.iloc[-1][k]) for k in ('Open','High','Low','Close','Volume')}

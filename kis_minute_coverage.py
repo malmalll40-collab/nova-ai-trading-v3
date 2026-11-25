@@ -3,6 +3,7 @@ from datetime import datetime
 import math
 import pandas as pd
 from kis_gap_probe import alternate_queries, compare_same_day
+from kis_zero_gap import certify_zero_gaps, nonnegative_int
 
 MAX_PAGES = 12
 MAX_GAP_PAGES = 4
@@ -15,13 +16,15 @@ STOPS = frozenset(('REACHED_OPEN','EMPTY_PAGE','CURSOR_STALLED','PAGE_LIMIT','NO
 
 def collect(api, code, day, start, close):
     rows = {}; pages = 0; gaps = 0; stop = 'NOT_STARTED'
-    alternate = 0; comparison = {}
+    alternate = 0; comparison = {}; cumulative = {}; zero_proofs = {}
     expected = list(pd.date_range(start, close-pd.Timedelta(minutes=11), freq='min')) + [close]
     day_key = day.strftime('%Y%m%d')
     def diagnostic(reason):
         missing = [t for t in expected if t not in rows]
         return {'reason':reason,'stop':stop,'pages':pages,'gap_pages':gaps,
                 'alternate_pages':alternate,'same_day_probe':comparison,
+                'zero_proofs':zero_proofs,'certified_zero_count':len(zero_proofs),
+                'unresolved_count':len(missing)-len(zero_proofs),
                 'required':len(expected),'received_required':len(expected)-len(missing),
                 'missing_count':len(missing),'missing_minutes':[t.strftime('%H:%M') for t in missing],
                 'open_present':start in rows,'close_present':close in rows,
@@ -49,6 +52,9 @@ def collect(api, code, day, start, close):
             if not math.isfinite(volume) or volume<0 or not volume.is_integer():return [], 'INVALID_VOLUME'
             val['Volume']=volume
             if stamp in rows and rows[stamp]!=val:return [], 'CONFLICTING_DUPLICATE'
+            cum=nonnegative_int(x.get('acml_vol'))
+            if stamp in cumulative and cumulative[stamp]!=cum:cumulative[stamp]=None
+            elif stamp not in cumulative:cumulative[stamp]=cum
             rows[stamp]=val;times.append(stamp)
         return times, None
     cursor=close.strftime('%H%M%S')
@@ -79,7 +85,8 @@ def collect(api, code, day, start, close):
     missing=[t for t in expected if t not in rows]
     if missing:
         comparison=compare_same_day(api,code,day,missing,close)
-        return None,diagnostic('COVERAGE_MISSING')
+        zero_proofs=certify_zero_gaps(api,code,day,missing,close,rows,cumulative,comparison)
+        if len(zero_proofs)!=len(missing):return None,diagnostic('COVERAGE_MISSING')
     if rows[start]['Volume']<=0 or rows[close]['Volume']<=0:return None,diagnostic('OPEN_CLOSE_VOLUME_INVALID')
     executed=[v for v in rows.values() if v['Volume']>0]
     result={'Open':rows[start]['Open'],'High':max(v['High'] for v in executed),

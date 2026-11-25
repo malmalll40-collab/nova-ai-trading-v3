@@ -5,6 +5,9 @@ Never infer that a weekday is open.  A missing calendar always fails closed.
 from __future__ import annotations
 
 from datetime import date
+from threading import RLock
+
+_CALENDAR_LOCK = RLock()
 
 
 class CalendarUnavailable(RuntimeError):
@@ -14,6 +17,12 @@ class CalendarUnavailable(RuntimeError):
 
 
 def get_krx_calendar(day: date):
+    """Serialize provider initialization, including the bounded fallback."""
+    with _CALENDAR_LOCK:
+        return _load_krx_calendar(day)
+
+
+def _load_krx_calendar(day: date):
     try:
         import exchange_calendars as ec
     except (ImportError, OSError):

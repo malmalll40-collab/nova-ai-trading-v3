@@ -40,8 +40,10 @@ def unverified_reason(a, now):
 
 
 def summarize_rows(day, symbols, rows, version, total):
+    from kis_zero_gap import sanitized_proofs
     states = {}
     invalid = set()
+    zero_symbols = {}
     for symbol, raw in rows:
         if symbol not in symbols: continue
         try:
@@ -51,6 +53,14 @@ def summarize_rows(day, symbols, rows, version, total):
                      p.get('price_basis') == 'KIS_REGULAR_MINUTE' and p.get('research_only') is True and
                      isinstance(p.get('signals'), dict))
             if not valid: raise ValueError('invalid')
+            if 'minute_coverage_proof' in p:
+                d=p['minute_coverage_proof']
+                proof=sanitized_proofs(d.get('zero_proofs')) if isinstance(d,dict) else {}
+                if (not proof or d.get('reason')!='VERIFIED' or d.get('unresolved_count')!=0
+                        or d.get('certified_zero_count')!=len(proof) or d.get('missing_count')!=len(proof)
+                        or set(d.get('missing_minutes') or [])!=set(proof)
+                        or d.get('required')!=d.get('received_required',-1)+len(proof)):raise ValueError('invalid proof')
+                zero_symbols[symbol]=sorted(proof)
             state = 'EXISTS' if p['signals'] else 'PRICE_ONLY'
             if symbol in states: invalid.add(symbol)
             states[symbol] = state
@@ -60,7 +70,8 @@ def summarize_rows(day, symbols, rows, version, total):
     return {'day': day, 'status': 'READ_OK', 'total_rows': total, 'day_rows': len(rows),
             'verified_signals': len(verified), 'price_only': len(price_only), 'verified_symbols': verified,
             'missing_symbols': [s for s in symbols if s not in verified and s not in price_only],
-            'invalid_symbols': [s for s in symbols if s in invalid]}
+            'invalid_symbols': [s for s in symbols if s in invalid],
+            'certified_zero_symbols': {s:zero_symbols[s] for s in symbols if s in zero_symbols and s not in invalid}}
 
 
 def audit_day(day, symbols):
@@ -124,7 +135,7 @@ def integrity_detail(payload):
     if isinstance(coverage,dict) and isinstance(coverage.get('reason'),str) and coverage['reason'] in CODES:
         d={'reason':coverage['reason']}
         if isinstance(coverage.get('stop'),str) and coverage['stop'] in STOPS:d['stop']=coverage['stop']
-        for k in ('pages','gap_pages','alternate_pages','required','received_required','missing_count','zero_volume_minutes'):
+        for k in ('pages','gap_pages','alternate_pages','required','received_required','missing_count','zero_volume_minutes','certified_zero_count','unresolved_count'):
             v=coverage.get(k)
             if type(v) is int and 0<=v<=1500:d[k]=v
         for k in ('open_present','close_present'):
@@ -137,6 +148,9 @@ def integrity_detail(payload):
             d['same_day_probe']={k:v for k,v in list(probe.items())[:4]
                 if isinstance(k,str) and re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',k)
                 and isinstance(v,str) and v in PROBE_CODES}
+        from kis_zero_gap import sanitized_proofs
+        proof=sanitized_proofs(coverage.get('zero_proofs'))
+        if proof:d['zero_proofs']=proof
         detail['minute_coverage']=d
     return detail
 

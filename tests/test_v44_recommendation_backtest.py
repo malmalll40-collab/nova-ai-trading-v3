@@ -140,4 +140,4 @@ def test_ui_has_backend_connection_and_pwa_cache():
     assert '/api/recommendations/backtest/status' in js
     assert 'nova3-shell-v45' in sw
     assert '/static/recommendation_history.js' in sw
-    assert server.healthz()['app_version']=='5.6.7'
+    assert server.healthz()['app_version']=='5.6.8'

@@ -121,7 +121,7 @@ def test_chart_isolated_from_trading_decisions(monkeypatch):
     monkeypatch.setattr(server,'_payload',lambda *a,**k: (_ for _ in ()).throw(AssertionError('chart must not call analysis')))
     assert c.get('/api/chart/history?symbol=005930.KS&timeframe=1w').status_code==200
     info=c.get('/healthz').json()
-    assert info['app_version']=='5.6.7'
+    assert info['app_version']=='5.6.8'
     assert info['higher_timeframe_charts'] and info['higher_timeframes_affect_signal'] is False
 
 

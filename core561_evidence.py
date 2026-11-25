@@ -17,6 +17,16 @@ def snapshot(a,now):
     s=base_snapshot(a,now)
     if s is None:return None
     s.update(version=VERSION,id=f'{VERSION}|{s["symbol"]}|{s["day"]}',risk_veto=s.get('route')=='risk_veto' or s.get('subregime')=='down')
+    coverage=(a.get('daily_integrity') or {}).get('minute_coverage') or {}
+    if coverage.get('zero_proofs'):
+        from collection_audit import integrity_detail
+        detail=integrity_detail(a).get('minute_coverage',{})
+        proof=detail.get('zero_proofs') or {}
+        if (not proof or detail.get('reason')!='VERIFIED' or detail.get('unresolved_count')!=0
+                or detail.get('certified_zero_count')!=len(proof) or detail.get('missing_count')!=len(proof)
+                or set(detail.get('missing_minutes') or [])!=set(proof)
+                or detail.get('required')!=detail.get('received_required',-1)+len(proof)):return None
+        s['minute_coverage_proof']=detail
     return s
 
 def record(a,now=None):

@@ -92,7 +92,7 @@ def test_aligned_no_trade_not_mislabelled_safe():
 
 def test_v521_ui_and_batch_integration():
     import server
-    assert server.healthz()['app_version']=='5.6.7'
+    assert server.healthz()['app_version']=='5.6.8'
     html=(server.ASSETS/'index.html').read_text()
     js=(server.ASSETS/'v5_dashboard.js').read_text()
     assert 'id="v521AlignedCards"' in html and 'id="v521FilterSummary"' in html
