@@ -2041,15 +2041,20 @@ def _start_ops(full=True):
         return 'running'
 
 
-def _start_v574_data_probe():
+def _start_v574_data_probe(version='574'):
     """Startup-only, explicit research diagnostic mode. Never runs full batch."""
     from ops_diagnostics import emit
-    from nova_v574_data_audit import pilot
+    if version=='575':
+        from nova_v575_calendar_coverage import pilot
+    elif version=='574':
+        from nova_v574_data_audit import pilot
+    else:raise ValueError('unknown data probe')
+    event='v'+version+'_data'
     from data_sources import KIS
     now=datetime.now(KST)
     schedule=krx_session(now)
     if not schedule.get('calendar_verified') or schedule.get('status')!='CLOSED':
-        emit('v574_data_end',{'status':'SKIPPED','reason':'MARKET_OPEN_OR_UNVERIFIED','strategy_adoption':'HOLD'})
+        emit(event+'_end',{'status':'SKIPPED','reason':'MARKET_OPEN_OR_UNVERIFIED','strategy_adoption':'HOLD'})
         return 'skipped'
     with OPS_LOCK:
         if OPS_STATE['status']=='running':return 'running'
@@ -2064,7 +2069,7 @@ def _start_v574_data_probe():
         started=time.monotonic()
         try:
             key,secret=_kis_creds()
-            result=pilot(KIS(key,secret),now,progress=lambda stats:emit('v574_data_stream',stats))
+            result=pilot(KIS(key,secret),now,progress=lambda stats:emit(event+'_stream',stats))
         except Exception:
             pass # never log provider exceptions
         finally:
@@ -2074,15 +2079,15 @@ def _start_v574_data_probe():
                     if BATCH_RESEARCH_STATE.get('job_id')==job:
                         BATCH_RESEARCH_STATE.clear();BATCH_RESEARCH_STATE.update(previous)
                 OPS_STATE.update(status='complete' if result.get('status')=='READY' else 'failed',result=result)
-            emit('v574_data_end',result)
-    try:threading.Thread(target=worker,daemon=True,name='nova-v574-data-probe').start()
+            emit(event+'_end',result)
+    try:threading.Thread(target=worker,daemon=True,name='nova-v'+version+'-data-probe').start()
     except Exception:
         with OPS_LOCK:
             with BATCH_RESEARCH_LOCK:
                 if BATCH_RESEARCH_STATE.get('job_id')==job:
                     BATCH_RESEARCH_STATE.clear();BATCH_RESEARCH_STATE.update(previous)
             OPS_STATE.update(status='failed',result={'status':'UNAVAILABLE','reason':'THREAD_START_FAILED','strategy_adoption':'HOLD'})
-        emit('v574_data_end',{'status':'UNAVAILABLE','reason':'THREAD_START_FAILED','strategy_adoption':'HOLD'})
+        emit(event+'_end',{'status':'UNAVAILABLE','reason':'THREAD_START_FAILED','strategy_adoption':'HOLD'})
         return 'failed'
     return 'running'
 
@@ -2116,6 +2121,7 @@ def _ops_startup():
     threading.Thread(target=probe,daemon=True,name='nova-checkpoint-probe').start()
     if os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1':_start_ops(True)
     elif os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='574':_start_v574_data_probe()
+    elif os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='575':_start_v574_data_probe('575')
 
 
 

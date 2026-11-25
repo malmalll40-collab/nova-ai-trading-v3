@@ -13,6 +13,7 @@ KST=ZoneInfo('Asia/Seoul')
 PILOT_SYMBOLS=('005930.KS','000660.KS','247540.KQ','263750.KQ')
 INDEX_CODES={'^KS11':'0001','^KQ11':'1001'}
 MAX_PAGES=12
+MAX_INDEX_PAGES=20
 MAX_CALLS=72
 MAX_SECONDS=240
 PILOT_DAYS=1096
@@ -74,8 +75,8 @@ def parse_row(r,index=False):
 def collect(api,symbol,start,end,expected,budget,*,max_pages=MAX_PAGES,pause=time.sleep):
     if not (type(start) is date and type(end) is date and start<=end):
         raise ValueError('invalid date range')
-    if max_pages<1 or max_pages>MAX_PAGES:raise ValueError('invalid page limit')
     index=symbol in INDEX_CODES
+    if type(max_pages) is not int or not 1<=max_pages<=(MAX_INDEX_PAGES if index else MAX_PAGES):raise ValueError('invalid page limit')
     if not index and not re.fullmatch(r'\d{6}\.(KS|KQ)',symbol):raise ValueError('invalid symbol')
     sessions=set(expected)
     if not sessions or any(d<start or d>end for d in sessions):raise ValueError('invalid sessions')
