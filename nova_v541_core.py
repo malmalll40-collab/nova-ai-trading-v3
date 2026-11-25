@@ -103,6 +103,10 @@ def study(f,ids,rows,market,cost):
     base={'status':'UNAVAILABLE','strategy_adoption':'HOLD','research_only':True,'historical_session_verified':False}
     if market is None or not ids:return {**base,'reason':'공통 시장지수 또는 평가 시점 부족'}
     ind=indicators(f); pts={i:point(f,i,market,ind) for i in ids}
+    from nova_v573_ml import feature_vector
+    def research_features(i):
+        try:return feature_vector(f,i,market,ind)
+        except (ValueError, TypeError, KeyError, AttributeError, IndexError, OverflowError):return None
     if any(x['status']!='READY' for x in pts.values()):return {**base,'reason':'ADX 또는 시장 자료 결측: 공통 비교 보류'}
     def report(s,subset=ids):
         if not subset:return {'status':'UNAVAILABLE','reason':'해당 국면 표본 없음'}
@@ -130,7 +134,7 @@ def study(f,ids,rows,market,cost):
       'v552_routes':{k:sum(p['v552_route']==k for p in pts.values()) for k in ('core','rs_required','rs_hybrid','risk_veto','unknown')},
       'candidate_changes':{k:change_metrics({i:rows[i][1] for i in ids},base_s,{i:pts[i]['candidates'][k] for i in ids}) for k in CANDIDATES},
       'v550_regimes':{k:{'samples':len(subset),'strategies':{j:report({i:pts[i]['candidates'][j] for i in ids},subset) for j in (*V550_NAMES,*V552_NAMES)}} for k in ('sideways','up_transition','strong_up','mild_up','down') for subset in [[i for i in ids if pts[i]['subregime']==k]]},
-      '_replay':{'dates':[_day(t) for t in f.index[ids[0]:ids[-1]+HORIZON+1]],'open':[float(v) for v in f.Open.iloc[ids[0]:ids[-1]+HORIZON+1]],'close':[float(v) for v in f.Close.iloc[ids[0]:ids[-1]+HORIZON+1]],'points':{_day(f.index[i]):{'signals':{k:s[i] for k,s in signals.items()},'ablations':pts[i]['ablations'],'candidates':pts[i]['candidates'],'regime':pts[i]['regime'],'subregime':pts[i]['subregime'],'grade':pts[i]['hybrid_grade'],'route':pts[i]['v552_route'],'market_regime':pts[i]['market_regime'],'label':int(rows[i][1]),'net':float(rows[i][2])} for i in ids}},
+      '_replay':{'dates':[_day(t) for t in f.index[ids[0]:ids[-1]+HORIZON+1]],'open':[float(v) for v in f.Open.iloc[ids[0]:ids[-1]+HORIZON+1]],'close':[float(v) for v in f.Close.iloc[ids[0]:ids[-1]+HORIZON+1]],'points':{_day(f.index[i]):{'signals':{k:s[i] for k,s in signals.items()},'ablations':pts[i]['ablations'],'candidates':pts[i]['candidates'],'regime':pts[i]['regime'],'subregime':pts[i]['subregime'],'grade':pts[i]['hybrid_grade'],'route':pts[i]['v552_route'],'market_regime':pts[i]['market_regime'],'label':int(rows[i][1]),'net':float(rows[i][2]),'ml_features':research_features(i),'ml_stock_risk_ok':next((a['pass'] is True for a in pts[i]['checks'] if a['key']=='risk'),False)} for i in ids}},
       'limitations':'국면별 결과는 해당 국면에서만 진입한 별도 가상자산이며 합산 불가. 제거 실험은 연구용이며 위험 제한 제거도 실전 미적용. 고정 기준의 사후 연구, 과거 세션 미검증, 중첩 기회·생존편향, 전향 검증 필요.'}
 
 def batch_summary(rows):
