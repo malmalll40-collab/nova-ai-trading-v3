@@ -1,3 +1,7 @@
 # NOVA v5.6.3 source migration
 
 Source files extracted without changing file contents from the archived v5.6.3 release at commit 137de1978924ce2847516503671e8c760d47ec0e. The original archive remains in Git history and the migration branch before this commit. The two scheduled workflow files are stored under `.github/workflow-templates/` (inactive) to prevent unintended scheduled collection. `NOVA_BUILD_COMPAT.zip` is an empty valid archive required by the existing Render build command; it does not overwrite any source file. No credentials or database settings are changed. Do not sync the historical render.yaml as a new Blueprint.
+
+## Auto-deploy verification
+
+2026-11-25: documentation-only commit to verify Render's On Commit integration. No application code, dependencies, scheduled workflows, or credentials changed. Deployment success must be verified separately in Render.
