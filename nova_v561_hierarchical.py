@@ -17,15 +17,27 @@ def disjoint(rows):
     return out
 
 def choose(cur,history):
+    eligible=None
+    def pool_for(k):
+        nonlocal eligible
+        if eligible is None:eligible=_eligible(history,cur['day'])
+        return disjoint(p for p in eligible if p.get('signals',{}).get(k)=='BUY')
+    return _choose_with_pool(cur,pool_for)
+
+
+def _eligible(history,day):
+    return [p for p in history if p['exit_day']<day and p['day']<day and p.get('net_pct') is not None and math.isfinite(p['net_pct']) and not p.get('risk_veto')]
+
+
+def _choose_with_pool(cur,pool_for):
     sig=cur.get('signals',{}); regime=cur.get('subregime'); symbol=cur['symbol'];day=cur['day']
     out={'signal':'HOLD','state':None,'route':None,'expected_net_pct':None,'probability':None,'scores':{},'research_position_pct':0,'candidate_diagnostics':{}}
     if not sig: return {**out,'state':'DATA_MISSING'}
     if cur.get('risk_veto') or regime not in ('strong_up','mild_up','sideways','up_transition'):return {**out,'state':'RISK_OR_DATA_VETO'}
     keys=[k for k in ACTIVE if sig.get(k)=='BUY']
     if not keys:return {**out,'state':'NO_BUY_CANDIDATE'}
-    history=[p for p in history if p['exit_day']<day and p['day']<day and p.get('net_pct') is not None and math.isfinite(p['net_pct']) and not p.get('risk_veto')]
     for k in keys:
-        pool=disjoint(p for p in history if p.get('signals',{}).get(k)=='BUY')
+        pool=pool_for(k)
         n=len(pool); ns=len({p['symbol'] for p in pool});diag={'pool_samples':n,'pool_symbols':ns}
         out['candidate_diagnostics'][k]=diag
         if n<MIN_POOL or ns<MIN_SYMBOLS:diag['state']='INSUFFICIENT_POOL';continue
@@ -55,11 +67,23 @@ def replay_panel(frames,symbols,horizon=5,*,holdout_bucket=False):
     """Advance all symbols synchronously, never use same-day or later exits."""
     history=[]; result=[[] for _ in frames]
     for i in range(len(frames[0][2])):
-        pending=[]
+        pending=[]; eligible_by_day={}; pools={}
+        # Disjoint selection is independent per symbol. Sharing the matured pool
+        # across decisions on the same date does not change order or membership.
+        def pool_for(day,k):
+            key=(day,k)
+            if key not in pools:
+                if day not in eligible_by_day:eligible_by_day[day]=_eligible(history,day)
+                pools[key]=disjoint(p for p in eligible_by_day[day] if p.get('signals',{}).get(k)=='BUY')
+            return pools[key]
         for j,((dates,_,pts),symbol) in enumerate(zip(frames,symbols)):
             p=pts[i];cur={'symbol':symbol,'day':dates[i],'subregime':p.get('subregime'),'signals':{**p['signals'],**p['candidates']},'risk_veto':p.get('route')=='risk_veto' or p.get('subregime')=='down' or p.get('market_regime')=='down'}
-            train=history if not holdout_bucket else [r for r in history if r['symbol']!=symbol and (bucket(symbol) is None or bucket(r['symbol'])!=bucket(symbol))]
-            result[j].append(choose(cur,train));pending.append({**cur,'exit_day':dates[i+horizon],'net_pct':float(p['net'])*100})
+            def decision_pool(k):
+                pool=pool_for(cur['day'],k)
+                if not holdout_bucket:return pool
+                b=bucket(symbol)
+                return [r for r in pool if r['symbol']!=symbol and (b is None or bucket(r['symbol'])!=b)]
+            result[j].append(_choose_with_pool(cur,decision_pool));pending.append({**cur,'exit_day':dates[i+horizon],'net_pct':float(p['net'])*100})
         history.extend(pending)
     return result
 

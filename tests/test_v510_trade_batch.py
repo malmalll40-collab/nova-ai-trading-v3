@@ -89,6 +89,7 @@ def test_batch_auth_validate_and_finish(monkeypatch):
 def test_batch_failure_is_marked_not_fabricated(monkeypatch):
     import server
     monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
+    monkeypatch.setattr(server,'_batch_retry_wait',lambda:None)
     def fail(*_):raise RuntimeError('test token/secret should not leak')
     monkeypatch.setattr(server,'_v5_one',fail)
     client=TestClient(server.app)

@@ -14,7 +14,7 @@ def test_v5_fail_closed_no_live_adoption():
     from pathlib import Path
     import server
     h=server.healthz()
-    assert h['app_version']=='5.6.3'
+    assert h['app_version']=='5.6.4'
     assert h['orders_enabled'] is False and not h['v5_ai_auto_adoption']
     assert h['v5_lab_enabled'] and h['v5_ui_tabs']==6
     html=(server.ASSETS/'index.html').read_text()
