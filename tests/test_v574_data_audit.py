@@ -87,3 +87,21 @@ def test_calendar_failure_no_provider_call():
     def fail(*a):raise RuntimeError('calendar unavailable')
     res=m.pilot(f,datetime(2024,1,8,tzinfo=m.KST),calendar=fail)
     assert res['reason']=='CALENDAR_UNAVAILABLE' and not f.calls
+
+def test_startup_mode_is_explicit(monkeypatch):
+    import ops_diagnostics as ops
+    for mode,full,probe in [('0',False,False),('1',True,False),('574',False,True)]:
+        monkeypatch.setenv('NOVA_OPS_DIAGNOSTICS_ON_START',mode)
+        c=ops.configured()
+        assert c['startup_full_enabled'] is full and c['startup_data_probe_enabled'] is probe
+        assert c['orders_enabled'] is False
+
+def test_open_market_probe_skips_before_provider(monkeypatch):
+    import server
+    import ops_diagnostics as ops
+    logs=[]
+    monkeypatch.setattr(server,'krx_session',lambda now:{'calendar_verified':True,'status':'OPEN'})
+    monkeypatch.setattr(ops,'emit',lambda event,payload:logs.append((event,payload)))
+    monkeypatch.setattr(server,'_kis_creds',lambda:pytest.fail('must not load credentials'))
+    assert server._start_v574_data_probe()=='skipped'
+    assert logs[-1][1]['reason']=='MARKET_OPEN_OR_UNVERIFIED'
