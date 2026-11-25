@@ -164,6 +164,8 @@ def batch_summary(state):
     except Exception:pass # reporting must not affect research
     try:emit_calibration572(state)
     except Exception:pass # reporting must not affect research
+    try:emit_ml573(state)
+    except Exception:pass # reporting must not affect research
     rows=state.get('rows') or [];aligned=state.get('core542_aligned') or {};u=aligned.get('v561_unified') or {}
     portfolio=u.get('portfolio') or {}; groups=u.get('by_group') or {}
     def perf(p):return {k:num(p.get(k)) for k in ('return_pct','mdd_pct','trades','stress_return_pct')}
@@ -228,3 +230,31 @@ def emit_calibration572(state):
     for kind,keys in (('by_regime',V570_REGIMES),('by_market',V570_MARKETS)):
         for k in keys:
             emit('v572_historical_regime',{**base,'kind':kind,'regime':k,'metrics':summary((d.get(kind) or {}).get(k) or {})})
+
+def emit_ml573(state):
+    d=(state.get('core542_aligned') or {}).get('v573_ml') or {}
+    status=d.get('status') if d.get('status') in ('READY','INSUFFICIENT') else 'UNAVAILABLE'
+    base={'model_version':'5.7.3','status':status,'historical_only':True,'strategy_adoption':'HOLD'}
+    if status=='UNAVAILABLE':
+        emit('v573_historical',{**base,'reason':'FEATURES_MISSING' if d.get('reason')=='FEATURES_MISSING' else 'REPLAY_UNAVAILABLE'});return
+    def fields(x,keys):return {k:num((x or {}).get(k)) for k in keys}
+    def summary(x):
+        return {**fields(x,('candidates','scored','unscored','scored_dates','scored_symbols','nonoverlap_scored','loss_scored')),
+            **{k:fields(x.get(k),('logit','boost','naive')) for k in ('brier','nonoverlap_brier')},
+            'expected_return_mae_pct':fields(x.get('expected_return_mae_pct'),('ridge','naive')),
+            'loss_brier':fields(x.get('loss_brier'),('loss_probability','naive_loss')),
+            'calibration_bins':{k:[fields(b,('lo','hi','n','mean_probability','positive_rate')) for b in (x.get('calibration_bins') or {}).get(k,[])[:5] if isinstance(b,dict)] for k in ('logit','boost','naive')}}
+    emit('v573_historical',{**base,'start':day(d.get('start')),'end':day(d.get('end')),'outcome_end':day(d.get('outcome_end')),
+         'opportunities':num(d.get('opportunities')),'loss_threshold_pct':num(d.get('loss_threshold_pct')),
+         'market_coverage':fields(d.get('market_coverage'),V570_MARKETS)})
+    for cohort in ('core','range_research'):
+        x=(d.get('cohorts') or {}).get(cohort) or {}
+        emit('v573_historical_cohort',{**base,'cohort':cohort,'metrics':summary(x.get('overall') or {})})
+        for f in (x.get('folds') or [])[:30]:
+            emit('v573_historical_fold',{**base,'cohort':cohort,
+                 **{k:day(f.get(k)) for k in ('start','end','last_training_exit')},
+                 **fields(f,('train','train_dates','train_symbols','candidates','scored'))})
+        for kind,keys in (('by_regime',V570_REGIMES),('by_market',V570_MARKETS)):
+            for k in keys:
+                emit('v573_historical_regime',{**base,'cohort':cohort,'kind':kind,'regime':k,
+                     'metrics':summary((x.get(kind) or {}).get(k) or {})})
