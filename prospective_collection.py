@@ -8,12 +8,8 @@ ACCEPTED = ('SAVED', 'EXISTS', 'PRICE_ONLY', 'UNVERIFIED', 'DISABLED', 'ERROR')
 
 
 def permitted(day, now, calendar):
-    local = now.astimezone(KST)
-    if local.date().isoformat() != day or local.hour < 18:
-        return False
-    s = calendar(local)
-    return bool(s.get('calendar_verified') is True and s.get('day') == day
-                and s.get('close_kst') and not s.get('is_open'))
+    from collection_gate import inspect_gate
+    return inspect_gate(day, now, calendar)['reason'] == 'PERMITTED'
 
 
 def run(day, symbols, *, fetch, record, existing, now, calendar, progress):

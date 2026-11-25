@@ -1,0 +1,3 @@
+# v5.6.6 collector gate diagnostic hotfix
+
+Manual run 45588829483 authenticated successfully but returned skipped on 2026-11-25. Exact production cause was not logged. Distinguish verified holidays from calendar errors and other blocked states; retry blocked states twice, fail visibly if unresolved. Add safe startup gate and observation table read-only probes. Preserve strict same-day session and KIS evidence validation. Eight local gate tests passed with exchange-calendars 4.13.1, including Nov 25 after close; this does not establish the production calendar state. No changes to credentials, trade signals, order handling, or collection schedule.

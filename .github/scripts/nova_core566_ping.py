@@ -34,9 +34,18 @@ def main():
             if start.get('day') != day:
                 print('Collection date mismatch')
                 return 3
-            if start.get('status') == 'skipped':
-                print('Collection skipped by exchange calendar')
+            if start.get('status') == 'skipped' and start.get('reason') == 'HOLIDAY':
+                print('Verified exchange holiday; no collection')
                 return 0
+            if start.get('status') in ('blocked', 'skipped'):
+                reason = start.get('reason')
+                allowed = ('DATE_MISMATCH', 'BEFORE_WINDOW', 'CALENDAR_UNVERIFIED',
+                           'CALENDAR_DATE_MISMATCH', 'MARKET_NOT_CLOSED', 'SESSION_UNVERIFIED')
+                print('Collection blocked:', reason if reason in allowed else 'UNSPECIFIED')
+                if attempt == 2:
+                    return 4
+                time.sleep(20)
+                continue
             if start.get('status') != 'running':
                 print('Unexpected start status')
                 return 3

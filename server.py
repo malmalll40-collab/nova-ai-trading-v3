@@ -1856,10 +1856,15 @@ def _core566_worker(day):
 
 @app.post('/api/research/core566/collect')
 def core566_collect(request:Request):
-    from prospective_collection import permitted
+    from collection_gate import inspect_gate
+    from ops_diagnostics import emit
     _core566_auth(request)
     now=datetime.now(KST);day=now.date().isoformat()
-    if not permitted(day,now,krx_session):return {'status':'skipped','day':day}
+    gate=inspect_gate(day,now,krx_session)
+    try:emit('collection_gate',gate)
+    except Exception:pass
+    if gate['reason']!='PERMITTED':
+        return {'status':'skipped' if gate['reason']=='HOLIDAY' else 'blocked',**gate}
     with CORE561_LOCK:
         if CORE561_JOB['status']=='running':return {'status':'running','day':CORE561_JOB['day']}
         CORE561_JOB.update(status='running',results={},day=day,reason=None)
@@ -1995,6 +2000,13 @@ def _ops_startup():
     def probe():
         from prospective_collection import checkpoint_probe
         try:emit('checkpoint_probe',checkpoint_probe())
+        except Exception:pass
+        try:
+            from collection_gate import inspect_gate
+            from ops_diagnostics import database_probe
+            now=datetime.now(KST)
+            emit('collection_gate_probe',inspect_gate(now.date().isoformat(),now,krx_session))
+            emit('observation_probe',database_probe())
         except Exception:pass
     threading.Thread(target=probe,daemon=True,name='nova-checkpoint-probe').start()
     if os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1':_start_ops(True)
