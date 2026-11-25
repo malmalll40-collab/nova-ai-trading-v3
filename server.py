@@ -1835,7 +1835,8 @@ def _core566_auth(request: Request):
 
 def _core566_worker(day):
     from prospective_collection import run, existing_for_day, ACCEPTED
-    from collection_audit import audit_day, unverified_reason
+    from collection_audit import audit_day, unverified_reason, integrity_detail, retry_integrity_once
+    from daily_settlement_guard import discard_failed_regular_reference
     from core561_evidence import record
     from nova_v561_hierarchical import PRESET
     from ops_diagnostics import emit
@@ -1843,7 +1844,17 @@ def _core566_worker(day):
     def fetch(symbol):
         nonlocal active
         active=symbol
-        try:return _payload(symbol,'스윙','kis',15)
+        try:
+            def fresh(s):return _payload(s,'스윙','kis',15)
+            payload=fresh(symbol)
+            before=integrity_detail(payload)
+            payload,retry=retry_integrity_once(symbol,day,payload,fetch=fresh,
+                now=lambda:datetime.now(KST),calendar=krx_session,clear=discard_failed_regular_reference,wait=lambda:time.sleep(2))
+            if before['signal_hold']:
+                try:emit('prospective_integrity',{'day':day,'symbol':symbol,'before':before,
+                    'after':integrity_detail(payload),'retry':retry})
+                except Exception:pass
+            return payload
         except Exception:
             details[symbol]='FETCH_FAILED'
             raise

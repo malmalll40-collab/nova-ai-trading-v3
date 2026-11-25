@@ -107,6 +107,17 @@ def cached_regular_reference(api, code, day, *, force=False):
         return result
 
 
+def discard_failed_regular_reference(code, day):
+    """Invalidate only a negative cache entry for an explicit collector retry."""
+    key=(code,day.isoformat())
+    with _REGULAR_LOCK:
+        rec=_REGULAR_CACHE.get(key)
+        if rec is not None and rec[1] is None:
+            _REGULAR_CACHE.pop(key,None)
+            return True
+    return False
+
+
 def independent_quotes(api, code, symbol, date, *, force=False):
     key=(code,symbol,date.isoformat())
     with _CACHE_LOCK:

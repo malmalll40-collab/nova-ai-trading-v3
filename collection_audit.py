@@ -100,3 +100,42 @@ def audit_day(day, symbols):
         return {**base, 'status': 'NOT_CONFIGURED'}
     except Exception:
         return base
+
+
+# Only fixed values produced by the existing price-integrity guard are logged.
+_INTEGRITY_STATES = frozenset(('NOT_CHECKED','FUTURE_DATE','OLD_DATA','SETTLEMENT_PENDING',
+    'UNVERIFIED','PRICE_CONFLICT','VERIFIED','REGULAR_RECONSTRUCTED','REQUERY_RECOVERED','ARCHIVE_REUSED'))
+_INTEGRITY_ERRORS = frozenset(('KIS_ARCHIVE_READ_FAILED','KIS_SECONDARY_DATE_UNAVAILABLE',
+    'KIS_SECONDARY_QUERY_FAILED','KIS_REGULAR_QUERY_FAILED','KIS_REGULAR_COVERAGE_INCOMPLETE',
+    'KIS_REGULAR_VOLUME_UNVERIFIED','KIS_CHART_REQUERY_FAILED'))
+_RETRY_ERRORS = frozenset(('KIS_REGULAR_QUERY_FAILED','KIS_REGULAR_COVERAGE_INCOMPLETE'))
+
+
+def integrity_detail(payload):
+    g = payload.get('daily_integrity') or {} if isinstance(payload, dict) else {}
+    if not isinstance(g, dict): g = {}
+    state = g.get('state')
+    errors = g.get('errors') or []
+    return {'state': state if isinstance(state,str) and state in _INTEGRITY_STATES else 'UNKNOWN',
+            'errors': sorted({v for v in errors if isinstance(v,str) and v in _INTEGRITY_ERRORS}) if isinstance(errors,list) else [],
+            'signal_hold': g.get('signal_hold') is True}
+
+
+def retry_integrity_once(symbol, day, payload, *, fetch, now, calendar, clear, wait):
+    """Collector-only, one fresh fetch for same-day incomplete KIS minute evidence."""
+    from collection_gate import inspect_gate
+    diag = integrity_detail(payload)
+    if not (isinstance(payload,dict) and payload.get('symbol')==symbol and payload.get('source')=='kis'
+            and payload.get('mode')=='스윙' and not payload.get('is_demo') and not payload.get('asof_evaluation_only')
+            and diag['signal_hold'] and _RETRY_ERRORS.intersection(diag['errors'])
+            and (payload.get('daily_integrity') or {}).get('latest_date')==day):
+        return payload, 'NOT_NEEDED'
+    try:
+        if inspect_gate(day, now(), calendar)['reason']!='PERMITTED': return payload, 'WINDOW_BLOCKED'
+        wait()
+        moment=now()
+        if inspect_gate(day, moment, calendar)['reason']!='PERMITTED': return payload, 'WINDOW_BLOCKED'
+        clear(symbol[:6], moment.astimezone(KST).date())
+        return fetch(symbol), 'REQUERY_DONE'
+    except Exception:
+        return payload, 'REQUERY_FAILED'
