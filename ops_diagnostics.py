@@ -30,7 +30,7 @@ def configured():
             'collector_enabled':os.getenv('NOVA_CORE560_AUTO_ENABLED')=='1' and os.getenv('NOVA_AUTOTRACK_ENABLED')=='1' and len(os.getenv('NOVA_AUTOTRACK_TOKEN',''))>=24,
             'prospective_enabled':os.getenv('NOVA_CORE566_AUTO_ENABLED')=='1', 'prospective_token_configured':len(os.getenv('NOVA_AUTOTRACK_TOKEN',''))>=24,
             'startup_full_enabled':os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1',
-            'startup_data_probe_enabled':os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='574','orders_enabled':False}
+            'startup_data_probe_enabled':os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START') in ('574','575'),'orders_enabled':False}
 
 
 def num(x):
