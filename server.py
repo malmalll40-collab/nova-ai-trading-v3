@@ -513,7 +513,7 @@ def service_worker():
 
 @app.get('/healthz')
 def healthz():
-    return {'status':'ok','orders_enabled':False,'app_version':'5.6.4','ops_diagnostics':True,'v561_research':True,'v561_live_adoption':False,'v560_research':True,'v560_live_adoption':False,'v552_research':True,'v552_live_adoption':False,'analysis_chart_live':True,'v550_research':True,'v550_live_adoption':False,'analysis_modes':['1분','5분','15분','스윙'],'higher_trend_context_research_only':True,'release_tag':'4.5-stability-20261112','feature_tag':'4.5-domestic-only-20261112','scan_freshness_tag':'4.5-session-aware-rejection-20261112','flow_history_tag':'4.5-nav-flow-per-investor-20261112','stock_name_search':True,'dart_feature':True,'financial_risk_filter':True,'historical_fundamental_backtest':False,'forward_signal_journal':True,'evidence_lab_version':'4.7.0-auto-research','persistent_server_journal':evidence_backend()!='disabled','watchlist_visible_tab_only':True,'push_notifications':False,'strict_signal_quality':True,'quality_hit_rate_verified':False,'final_signal_policy':'financial-then-notification','intraday_journal_verified':False,'candlestick_chart':True,'stock_news':True,'news_affects_signal':False,'signal_role_statistics':True,'calibrated_buy_probability':False,'higher_timeframe_charts':True,'higher_timeframes_affect_signal':False,'market_recommendations':True,'nasdaq_search':False,'nasdaq_watchlist_scan':False,'us_tickers_enabled':False,'korean_market_only':True,'market_scope_tag':'4.5-domestic-only-20261112','domestic_interest_candidates':True,'market_scan_requires_krx_api':False,'market_scan_fsc_tplus1':True,'realtime_market_scan':False,'server_persistent_scan_results':evidence_backend()!='disabled','historical_market_screen_backtest':True,'full_recommendation_strategy_backtested':False,'high_precision_adoption_mode':'SHADOW_ONLY','high_precision_live_validated':False,'shadow_context_tag':'5.3.4-kis-index-etf-proxy','investor_flows_daily':True,'investor_flows_naver_fallback':True,'structure_levels_research_only':True,'krx_market_calendar':'XKRX_with_verified_special_hours','quote_rest_polling':True,'realtime_quote_websocket':False,'kis_ws_optional_readonly':True,'kis_ws_enabled':kis_ws_status()['enabled'],'v54_walk_forward_accuracy':True,'v542_hybrid_research':True,'v542_hybrid_live_adoption':False,'v541_core_adaptive_research':True,'v541_core_live_adoption':False,'v54_live_adoption':False,'v5_lab_enabled':True,'v51_batch_research':True,'v51_trade_ledger':True,'v52_risk_audit':True,'v52_filters_live_adopted':False,'v521_aligned_backtest':True,'v521_calendar_diagnostics':True,'v53_evidence_gate':True,'v53_shadow_role_groups':True,'v53_live_adoption':False,'v531_price_source_audit':True,'v532_kis_session_integrity_guard':True,'v532_kis_cross_checked_requery':True,'v531_price_reconciliation_live_adopted':False,'v5_ai_auto_adoption':False,'v5_ml_probability_calibrated':False,'v5_ui_tabs':6,'kis_period_rest_polling':True,'kis_period_native_ohlcv':True,'auto_swing_kis_first':True,'kis_regular_ohlcv_reconstruction':True,'kis_only_analysis':True,'yahoo_manual_audit_only':True,'completed_session_freshness':True,'kis_period_refresh_seconds':20,'domestic_activity_top20':True,'naver_popular_official_link_only':True,'recommendation_breadth':'24-48-60','market_regime_research':'observed_only_shadow_v47','market_regime_live_adoption':False,'candle_research_history':True,'core_comparison_research_only':True,'core_live_adoption':False,'strict_buy_policy_unchanged':True,'investor_flow_research_only':True,'recommendation_ui_release':'2026-11-20-status-rank-cachefix'}
+    return {'status':'ok','orders_enabled':False,'app_version':'5.6.5','ops_diagnostics':True,'v561_research':True,'v561_live_adoption':False,'v560_research':True,'v560_live_adoption':False,'v552_research':True,'v552_live_adoption':False,'analysis_chart_live':True,'v550_research':True,'v550_live_adoption':False,'analysis_modes':['1분','5분','15분','스윙'],'higher_trend_context_research_only':True,'release_tag':'4.5-stability-20261112','feature_tag':'4.5-domestic-only-20261112','scan_freshness_tag':'4.5-session-aware-rejection-20261112','flow_history_tag':'4.5-nav-flow-per-investor-20261112','stock_name_search':True,'dart_feature':True,'financial_risk_filter':True,'historical_fundamental_backtest':False,'forward_signal_journal':True,'evidence_lab_version':'4.7.0-auto-research','persistent_server_journal':evidence_backend()!='disabled','watchlist_visible_tab_only':True,'push_notifications':False,'strict_signal_quality':True,'quality_hit_rate_verified':False,'final_signal_policy':'financial-then-notification','intraday_journal_verified':False,'candlestick_chart':True,'stock_news':True,'news_affects_signal':False,'signal_role_statistics':True,'calibrated_buy_probability':False,'higher_timeframe_charts':True,'higher_timeframes_affect_signal':False,'market_recommendations':True,'nasdaq_search':False,'nasdaq_watchlist_scan':False,'us_tickers_enabled':False,'korean_market_only':True,'market_scope_tag':'4.5-domestic-only-20261112','domestic_interest_candidates':True,'market_scan_requires_krx_api':False,'market_scan_fsc_tplus1':True,'realtime_market_scan':False,'server_persistent_scan_results':evidence_backend()!='disabled','historical_market_screen_backtest':True,'full_recommendation_strategy_backtested':False,'high_precision_adoption_mode':'SHADOW_ONLY','high_precision_live_validated':False,'shadow_context_tag':'5.3.4-kis-index-etf-proxy','investor_flows_daily':True,'investor_flows_naver_fallback':True,'structure_levels_research_only':True,'krx_market_calendar':'XKRX_with_verified_special_hours','quote_rest_polling':True,'realtime_quote_websocket':False,'kis_ws_optional_readonly':True,'kis_ws_enabled':kis_ws_status()['enabled'],'v54_walk_forward_accuracy':True,'v542_hybrid_research':True,'v542_hybrid_live_adoption':False,'v541_core_adaptive_research':True,'v541_core_live_adoption':False,'v54_live_adoption':False,'v5_lab_enabled':True,'v51_batch_research':True,'v51_trade_ledger':True,'v52_risk_audit':True,'v52_filters_live_adopted':False,'v521_aligned_backtest':True,'v521_calendar_diagnostics':True,'v53_evidence_gate':True,'v53_shadow_role_groups':True,'v53_live_adoption':False,'v531_price_source_audit':True,'v532_kis_session_integrity_guard':True,'v532_kis_cross_checked_requery':True,'v531_price_reconciliation_live_adopted':False,'v5_ai_auto_adoption':False,'v5_ml_probability_calibrated':False,'v5_ui_tabs':6,'kis_period_rest_polling':True,'kis_period_native_ohlcv':True,'auto_swing_kis_first':True,'kis_regular_ohlcv_reconstruction':True,'kis_only_analysis':True,'yahoo_manual_audit_only':True,'completed_session_freshness':True,'kis_period_refresh_seconds':20,'domestic_activity_top20':True,'naver_popular_official_link_only':True,'recommendation_breadth':'24-48-60','market_regime_research':'observed_only_shadow_v47','market_regime_live_adoption':False,'candle_research_history':True,'core_comparison_research_only':True,'core_live_adoption':False,'strict_buy_policy_unchanged':True,'investor_flow_research_only':True,'recommendation_ui_release':'2026-11-20-status-rank-cachefix'}
 
 @app.get('/api/status')
 def status(request:Request):
@@ -1207,7 +1207,7 @@ def v532_daily_integrity(request: Request, symbol: str='005930.KS'):
 
 
 # Shared account-level on-demand batch. One short-lived job at a time to avoid
-# exhausting the Render free instance. Read-only; never writes Neon.
+# exhausting the Render free instance. Only explicit manual jobs may save historical checkpoints.
 BATCH_RESEARCH_LOCK=threading.RLock()
 BATCH_RESEARCH_STATE={
     'status':'idle','job_id':None,'symbols':[], 'rows':[],
@@ -1245,12 +1245,27 @@ def _v5_batch_fetch(symbol: str, source: str, cost_bps: int) -> dict:
 def _v5_batch_worker(job_id: str, symbols: list[str], source: str, cost_bps: int):
     from ops_diagnostics import progress_summary, emit
     batch_start=time.monotonic()
+    from research_checkpoint import scope_for, eligible_data, load as load_checkpoint, save as save_checkpoint
+    with BATCH_RESEARCH_LOCK:
+        enabled=BATCH_RESEARCH_STATE.get('checkpoint_enabled') is True
+        resume=BATCH_RESEARCH_STATE.get('resume_checkpoint') is True
+    scope=None; restored={}; saved=0; errors=0; skipped=0; restored_count=0
+    if enabled and evidence_backend()!='disabled':
+        try:
+            scope=scope_for(symbols,source,cost_bps)
+            if scope and resume:restored=load_checkpoint(scope)
+        except Exception:
+            errors+=1
+    def checkpoint_status():
+        return {'enabled':enabled,'eligible':scope is not None,'restored':restored_count,
+                'saved':saved,'skipped':skipped,'errors':errors,'ttl_hours':2,'manual_resume':True}
     def progress(phase, symbol=None, symbol_status=None, symbol_elapsed=None):
         with BATCH_RESEARCH_LOCK:
             if BATCH_RESEARCH_STATE.get('job_id')!=job_id:return False
             rows=BATCH_RESEARCH_STATE['rows']
             payload=progress_summary(phase,len(symbols),len(rows),sum(r.get('status')=='READY' for r in rows),time.monotonic()-batch_start,symbol,symbol_status,symbol_elapsed)
             BATCH_RESEARCH_STATE['progress']=payload
+            if enabled:BATCH_RESEARCH_STATE['checkpoint']=checkpoint_status()
         try:emit('research_progress',payload)
         except Exception:pass
         return True
@@ -1258,6 +1273,16 @@ def _v5_batch_worker(job_id: str, symbols: list[str], source: str, cost_bps: int
     for symbol in symbols:
         if not progress('symbol_start',symbol):return
         symbol_start=time.monotonic()
+        if symbol in restored:
+            with BATCH_RESEARCH_LOCK:
+                if BATCH_RESEARCH_STATE.get('job_id')!=job_id:return
+                BATCH_RESEARCH_STATE['rows'].append(restored[symbol])
+                restored_count+=1
+                BATCH_RESEARCH_STATE['finished']=len(BATCH_RESEARCH_STATE['rows'])
+            try:emit('research_checkpoint',{'symbol':symbol,'status':'RESTORED'})
+            except Exception:pass
+            if not progress('symbol_done',symbol,'READY',time.monotonic()-symbol_start):return
+            continue
         try:
             data=_v5_batch_fetch(symbol,source,cost_bps)
             if data.get('status')=='READY':
@@ -1281,6 +1306,18 @@ def _v5_batch_worker(job_id: str, symbols: list[str], source: str, cost_bps: int
                      'v53':data.get('v53',{}),'v54_accuracy':data.get('v54_accuracy',{}),'core541_current':data.get('core541_current',{}),
                      'aligned_backtest_comparison':data.get('aligned_backtest_comparison',{}),
                      'trade_diagnostics':data.get('trade_diagnostics',{})}
+                if scope and eligible_data(data,scope):
+                    row['checkpoint_day']=scope['day']
+                    try:
+                        if save_checkpoint(scope,row):
+                            saved+=1
+                            emit('research_checkpoint',{'symbol':symbol,'status':'SAVED'})
+                        else:skipped+=1
+                    except Exception:
+                        errors+=1
+                        try:emit('research_checkpoint',{'symbol':symbol,'status':'WRITE_FAILED'})
+                        except Exception:pass
+                elif scope:skipped+=1
             else:
                 row={'symbol':symbol,'status':data.get('status','UNAVAILABLE'),
                      'source':data.get('source'), 'reason':data.get('reason','자료 불충분')}
@@ -1311,6 +1348,7 @@ def _v5_batch_worker(job_id: str, symbols: list[str], source: str, cost_bps: int
             try:
                 from ops_diagnostics import emit, batch_summary
                 emit('research_batch',batch_summary(BATCH_RESEARCH_STATE))
+                if enabled:emit('research_checkpoint_summary',checkpoint_status())
             except Exception:pass # diagnostics must not affect research
 
 
@@ -1345,7 +1383,9 @@ def v5_batch_start(request: Request, body: dict):
         job_id=secrets.token_hex(10)
         BATCH_RESEARCH_STATE.update(status='running',job_id=job_id,symbols=symbols,
             rows=[],core542_aligned=None,progress=None,finished=0,started_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),
-            ended_at=None,source_requested=source,cost_bps_per_side=cost)
+            ended_at=None,source_requested=source,cost_bps_per_side=cost,
+            checkpoint_enabled=bool(os.getenv('NOVA_ACCESS_TOKEN','').strip()),
+            resume_checkpoint=body.get('resume_checkpoint') is True,checkpoint=None)
         threading.Thread(target=_v5_batch_worker,args=(job_id,symbols,source,cost),daemon=True).start()
     return JSONResponse({'status':'running','job_id':job_id,'requested':len(symbols),
              'research_only':True},headers={'Cache-Control':'no-store'})
@@ -1365,7 +1405,7 @@ def v5_batch_status(request: Request):
     snap['notes']=['동일 편도 비용 및 5거래일 가정이지만 종목별 검증 날짜·공급원이 다를 수 있습니다.',
                    '종목별 총자산 가상 수익률은 단일 통합 포트폴리오 수익률이 아닙니다.',
                    '생존 종목 편향·수정주가·체결 가능성·데이터 탐색 편향 미검증.',
-                   '서버 재시작·절전 시 임시 작업이 중단되거나 유실될 수 있습니다.',
+                   '서버 재시작 후 같은 거래일·종목 순서·비용으로 다시 실행하면 검증된 2시간 이내 체크포인트만 복구합니다. 미저장 자료는 다시 계산합니다.',
                    '과거 신호 연구일 뿐 실제 추천 성적이나 주문이 아닙니다.']
     return JSONResponse(snap,headers={'Cache-Control':'no-store'})
 
@@ -1875,7 +1915,7 @@ def _start_ops(full=True):
         if full:
             with BATCH_RESEARCH_LOCK:
                 if BATCH_RESEARCH_STATE['status']=='running':return 'batch_busy'
-                BATCH_RESEARCH_STATE.update(status='running',job_id=job_id,symbols=list(PRESET),rows=[],core542_aligned=None,progress=None,finished=0,started_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),ended_at=None,source_requested='kis',cost_bps_per_side=15)
+                BATCH_RESEARCH_STATE.update(status='running',job_id=job_id,symbols=list(PRESET),rows=[],core542_aligned=None,progress=None,finished=0,started_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),ended_at=None,source_requested='kis',cost_bps_per_side=15,checkpoint_enabled=False,resume_checkpoint=False,checkpoint=None)
         OPS_LAST_START=time.monotonic()
         OPS_STATE.update(status='running',result=None,job_id=job_id,started_at=datetime.now(timezone.utc).isoformat(timespec='seconds'))
         threading.Thread(target=_ops_worker,args=(job_id,full),daemon=True,name='nova-ops563').start()

@@ -367,7 +367,9 @@ function batchDisplay(state){
  const rows=state.rows||[];box.hidden=false;box.replaceChildren();
  msg.textContent=state.status==='running'?`여러 종목 분석 중: ${state.finished||0}/${state.symbols?.length||0} 완료 · 시세 공급원 응답에 따라 지연될 수 있습니다.`:
  state.status==='complete'?`일괄 분석 완료: ${rows.filter(r=>r.status==='READY').length}/${rows.length} 종목 계산 완료 · 개별 검증 구간 확인`:
- '작업 대기. 서버 재시작·절전 시 진행 중 작업이 사라질 수 있습니다.';
+ '작업 대기. 서버 재시작 후 같은 조건으로 다시 실행하면 유효한 저장 결과를 복구합니다.';
+ const cp=state.checkpoint;
+ if(cp?.enabled)msg.textContent+=` · 체크포인트 복구 ${cp.restored||0}개 / 신규 저장 ${cp.saved||0}개${cp.skipped?' / 저장 제외 '+cp.skipped+'개':''}${cp.errors?' / 저장·조회 오류 '+cp.errors+'건':''}${cp.eligible?'':' / 저장 조건 미충족'}`;
  for(const r of rows){
    const wrap=el('details','v51-batch-stock');
    const headline=el('summary');headline.append(el('strong','',`${knownStockNames[r.symbol]||r.symbol} · ${r.symbol}`),el('span','',r.status==='READY'?'완료':'보류'));
@@ -559,7 +561,7 @@ async function batchStatus(){
  if(!response.ok)throw new Error(`진행 조회 HTTP ${response.status}`);
  const state=await response.json();
  if(!batchJob && state.status==='running' && state.job_id)batchJob=state.job_id;
- if(batchJob&&state.job_id!==batchJob){throw new Error('서버가 재시작되었거나 다른 작업이 시작되어 이전 작업 결과가 없습니다.');}
+ if(batchJob&&state.job_id!==batchJob){throw new Error('서버가 재시작되었거나 다른 작업이 시작됐습니다. 같은 조건으로 다시 실행하면 저장 결과를 복구합니다.');}
  batchDisplay(state);
  if(state.status==='running')batchPoll=setTimeout(()=>batchStatus().catch(batchFailure),5000);
  else{batchJob=null;const button=byId('v51BatchRun');if(button)button.disabled=false;}
@@ -577,7 +579,7 @@ async function runBatch(){
  try{
    const cost=window.NOVAConnect?.cost?.()??15;
    const response=await fetch('/api/research/v5/batch/run',{method:'POST',credentials:'same-origin',
-     headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols,extended_core_study:symbols.length>5,source:'kis',cost_bps:Math.max(0,Math.min(100,Math.round(Number(cost)||15)))})});
+     headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols,extended_core_study:symbols.length>5,source:'kis',resume_checkpoint:byId('v565ResumeCheckpoint')?.checked===true,cost_bps:Math.max(0,Math.min(100,Math.round(Number(cost)||15)))})});
    const result=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(result.detail||`HTTP ${response.status}`);
    batchJob=result.job_id;stopBatchPoll();await batchStatus();
