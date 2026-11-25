@@ -38,3 +38,26 @@ def test_historical_coverage():
     assert result['overall']['opportunities']==375 and result['market_coverage']=={'up':375}
     assert result['strategy_adoption']=='HOLD' and not result['independent_future_verified']
     assert result['overall']['v571']['trades']>0
+
+def test_three_way_comparison_and_market_coverage():
+    start=date(2026,1,1); dates=[str(start+timedelta(days=i)) for i in range(100)]
+    pts=[{'subregime':'strong_up','market_regime':'up' if i%2==0 else 'range','signals':{'core':'BUY' if i%2==0 else 'HOLD'},'candidates':{'rs_hybrid':'BUY'},'net':.02} for i in range(95)]
+    result=historical([(dates,None,pts)]*5,list('ABCDE'),5,15)
+    assert result['market_coverage']=={'up':240,'range':235}
+    assert result['by_market']['range']['core_candidates']==0
+    assert result['overall']['core_candidates']==240
+    assert set(result['overall']['matched_calibration'])=={'scored','v570','v571','v570_naive','v571_naive'}
+    assert result['overall']['v570']['trades']>=0
+
+def test_alignment_rejection():
+    import pytest
+    with pytest.raises(ValueError): historical([],[],5,15)
+    with pytest.raises(ValueError): historical([(['2026-01-01'],None,[])],['A'],5,15)
+
+def test_diagnostic_allowlist(monkeypatch):
+    import ops_diagnostics as ops
+    events=[]
+    monkeypatch.setattr(ops,'emit',lambda name,payload:events.append((name,payload)))
+    ops.emit_policy571({'core542_aligned':{'v571_policy':{'status':'READY','overall':{'opportunities':20,'secret':'DO_NOT_LOG','v571':{'trades':2,'raw':'DO_NOT_LOG'}},'market_coverage':{'up':20,'secret':9}}}})
+    assert len(events)==11 and events[0][1]['overall']['v571']['trades']==2
+    assert 'DO_NOT_LOG' not in str(events) and 'secret' not in str(events)
