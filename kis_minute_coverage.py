@@ -2,6 +2,7 @@
 from datetime import datetime
 import math
 import pandas as pd
+from kis_gap_probe import alternate_queries, compare_same_day
 
 MAX_PAGES = 12
 MAX_GAP_PAGES = 4
@@ -14,20 +15,22 @@ STOPS = frozenset(('REACHED_OPEN','EMPTY_PAGE','CURSOR_STALLED','PAGE_LIMIT','NO
 
 def collect(api, code, day, start, close):
     rows = {}; pages = 0; gaps = 0; stop = 'NOT_STARTED'
+    alternate = 0; comparison = {}
     expected = list(pd.date_range(start, close-pd.Timedelta(minutes=11), freq='min')) + [close]
     day_key = day.strftime('%Y%m%d')
     def diagnostic(reason):
         missing = [t for t in expected if t not in rows]
         return {'reason':reason,'stop':stop,'pages':pages,'gap_pages':gaps,
+                'alternate_pages':alternate,'same_day_probe':comparison,
                 'required':len(expected),'received_required':len(expected)-len(missing),
                 'missing_count':len(missing),'missing_minutes':[t.strftime('%H:%M') for t in missing],
                 'open_present':start in rows,'close_present':close in rows,
                 'zero_volume_minutes':sum(v['Volume']==0 for v in rows.values())}
-    def page(cursor):
+    def page(cursor,past='Y'):
         try:
             response=api.get('/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice','FHKST03010230',{
                 'FID_COND_MRKT_DIV_CODE':'J','FID_INPUT_ISCD':code,'FID_INPUT_HOUR_1':cursor,
-                'FID_INPUT_DATE_1':day_key,'FID_PW_DATA_INCU_YN':'Y','FID_FAKE_TICK_INCU_YN':''})
+                'FID_INPUT_DATE_1':day_key,'FID_PW_DATA_INCU_YN':past,'FID_FAKE_TICK_INCU_YN':''})
         except Exception: return [], 'QUERY_FAILED'
         if not isinstance(response,dict) or not isinstance(response.get('output2'),list):return [], 'INVALID_RESPONSE'
         times=[]
@@ -68,7 +71,15 @@ def collect(api, code, day, start, close):
         target=missing[0];attempted.add(target);gaps+=1
         _,error=page(target.strftime('%H%M%S'))
         if error:return None,diagnostic(error)
-    if any(t not in rows for t in expected):return None,diagnostic('COVERAGE_MISSING')
+    for target,cursor in alternate_queries([t for t in expected if t not in rows],close):
+        if target in rows:continue
+        alternate+=1
+        _,error=page(cursor,'N')
+        if error:return None,diagnostic(error)
+    missing=[t for t in expected if t not in rows]
+    if missing:
+        comparison=compare_same_day(api,code,day,missing,close)
+        return None,diagnostic('COVERAGE_MISSING')
     if rows[start]['Volume']<=0 or rows[close]['Volume']<=0:return None,diagnostic('OPEN_CLOSE_VOLUME_INVALID')
     executed=[v for v in rows.values() if v['Volume']>0]
     result={'Open':rows[start]['Open'],'High':max(v['High'] for v in executed),

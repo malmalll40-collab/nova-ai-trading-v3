@@ -1,0 +1,3 @@
+# NOVA v5.6.7 isolated minute gaps hotfix
+
+Production 2026-11-25: 18 verified rows; 086520.KQ missing 13:21; 263750.KQ missing 09:28, 10:25. Both reached opening in four pages and remained incomplete after targeted retry. Add at most four overlapping same-day queries to the original KIS daily minute endpoint (N option); exact same checks, no fabricated rows or alternate-source storage. For remaining gaps, separate same-day KIS endpoint diagnostic only, excluding first-row volume from interpretation. Twelve local mocked API tests passed, including recovery, overlap conflict and diagnostic-only behavior. Live provider results not yet verified. No changes to schema, credentials or existing observations.

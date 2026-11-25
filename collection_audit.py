@@ -124,13 +124,19 @@ def integrity_detail(payload):
     if isinstance(coverage,dict) and isinstance(coverage.get('reason'),str) and coverage['reason'] in CODES:
         d={'reason':coverage['reason']}
         if isinstance(coverage.get('stop'),str) and coverage['stop'] in STOPS:d['stop']=coverage['stop']
-        for k in ('pages','gap_pages','required','received_required','missing_count','zero_volume_minutes'):
+        for k in ('pages','gap_pages','alternate_pages','required','received_required','missing_count','zero_volume_minutes'):
             v=coverage.get(k)
             if type(v) is int and 0<=v<=1500:d[k]=v
         for k in ('open_present','close_present'):
             if type(coverage.get(k)) is bool:d[k]=coverage[k]
         minutes=coverage.get('missing_minutes')
         if isinstance(minutes,list):d['missing_minutes']=[v for v in minutes[:1500] if isinstance(v,str) and re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',v)]
+        from kis_gap_probe import PROBE_CODES
+        probe=coverage.get('same_day_probe')
+        if isinstance(probe,dict):
+            d['same_day_probe']={k:v for k,v in list(probe.items())[:4]
+                if isinstance(k,str) and re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',k)
+                and isinstance(v,str) and v in PROBE_CODES}
         detail['minute_coverage']=d
     return detail
 
