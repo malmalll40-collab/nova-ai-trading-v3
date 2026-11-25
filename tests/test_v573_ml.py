@@ -37,7 +37,7 @@ def panel():
             # Stagger eligible core dates across symbols; separate range population.
             market='range' if i%2 else 'up'
             pts.append({'ml_features':[float(sign)]+[0.]*12,'net':.08 if sign else -.07,
-                'signals':{'core':'BUY' if market=='up' and i%6==s else 'HOLD'},
+                'signals':{'core':'BUY' if market=='up' and (i//2)%6==s else 'HOLD'},
                 'market_regime':market,'subregime':'up_transition','route':'risk_veto' if market=='range' else 'core',
                 'ml_stock_risk_ok':True})
         frames.append((dates,None,pts))
