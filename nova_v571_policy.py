@@ -65,10 +65,14 @@ def decide(row, model):
 
 
 def historical(frames, symbols, horizon, cost):
-    from nova_v570_accuracy import metrics, REGIMES, MARKETS
+    from nova_v570_accuracy import metrics, REGIMES, MARKETS, fit as fit570, decide as decide570
+    if not frames or len(frames) != len(symbols) or len(set(symbols)) != len(symbols): raise ValueError('invalid panel')
+    if type(horizon) is not int or horizon < 1: raise ValueError('invalid horizon')
+    if any(dates != frames[0][0] or len(pts) != len(frames[0][2]) or len(dates) != len(pts) + horizon for dates, _, pts in frames): raise ValueError('unaligned panel')
+    if any(a >= b for a, b in zip(frames[0][0], frames[0][0][1:])): raise ValueError('unordered dates')
     history = []; rows = []
     for i, day in enumerate(frames[0][0][:len(frames[0][2])]):
-        model = fit(history, day, cost); pending = []
+        model = fit(history, day, cost); previous = fit570(history, day, cost); pending = []
         for (dates, _, pts), symbol in zip(frames, symbols):
             p = pts[i]
             r = {'day': dates[i], 'exit_day': dates[i+horizon], 'symbol': symbol,
@@ -76,15 +80,19 @@ def historical(frames, symbols, horizon, cost):
                  'risk_veto': p.get('route') == 'risk_veto', 'signals': {**p['signals'], **p['candidates']},
                  'net_pct': 100 * float(p['net']), 'cost_bps': cost}
             if not valid(r, cost): raise ValueError('invalid replay outcome')
-            r['decision'] = decide(r, model); pending.append(r)
+            r['decision'] = decide(r, model); r['v570'] = decide570(r, previous); pending.append(r)
         history.extend(pending); rows.extend(pending)
     def compare(data):
         base = [r for r in data if r['signals'].get('core') == 'BUY']
         new = [r for r in data if r['decision']['signal'] == 'BUY']
+        previous = [r for r in data if r['v570']['signal'] == 'BUY']
         blocked = [r for r in base if r['decision']['signal'] != 'BUY']
         scored = [r for r in data if r['decision']['probability'] is not None]
         def brier(k): return round(mean((r['decision'][k] - (r['net_pct'] > 0)) ** 2 for r in scored), 6) if scored else None
-        return {'opportunities': len(data), 'core': metrics(base, cost), 'v571': metrics(new, cost),
+        matched = [r for r in scored if r['v570']['probability'] is not None]
+        def common(model, key): return round(mean((r[model][key] - (r['net_pct'] > 0)) ** 2 for r in matched), 6) if matched else None
+        return {'opportunities': len(data), 'core_candidates': len(base), 'eligible_candidates': sum(eligible(r) for r in data), 'core': metrics(base, cost), 'v570': metrics(previous, cost), 'v571': metrics(new, cost),
+                'matched_calibration': {'scored': len(matched), 'v570': common('v570','probability'), 'v571': common('decision','probability'), 'v570_naive': common('v570','naive_probability'), 'v571_naive': common('decision','naive_probability')},
                 'blocked_wins': sum(r['net_pct'] > 0 for r in blocked), 'blocked_nonpositive': sum(r['net_pct'] <= 0 for r in blocked),
                 'scored': len(scored), 'brier': brier('probability'), 'naive_brier': brier('naive_probability'),
                 'states': dict(Counter(r['decision']['state'] for r in data))}
