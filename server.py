@@ -1835,22 +1835,50 @@ def _core566_auth(request: Request):
 
 def _core566_worker(day):
     from prospective_collection import run, existing_for_day, ACCEPTED
+    from collection_audit import audit_day, unverified_reason
     from core561_evidence import record
     from nova_v561_hierarchical import PRESET
     from ops_diagnostics import emit
-    results={}
+    results={}; details={}; active=None
+    def fetch(symbol):
+        nonlocal active
+        active=symbol
+        try:return _payload(symbol,'스윙','kis',15)
+        except Exception:
+            details[symbol]='FETCH_FAILED'
+            raise
+    def save(payload,now):
+        try:status=record(payload,now=now)
+        except Exception:
+            details[active]='RECORD_FAILED'
+            raise
+        if status=='UNVERIFIED':
+            try:details[active]=unverified_reason(payload,now)
+            except Exception:details[active]='SNAPSHOT_REJECTED_OTHER'
+        return status
     def progress(rows):
-        with CORE561_LOCK:CORE561_JOB['results']=rows
+        symbol=next(reversed(rows)); status=rows[symbol]
+        reason=details.get(symbol,status)
+        with CORE561_LOCK:
+            CORE561_JOB['results']=rows
+            CORE561_JOB['details']=dict(details)
+        try:emit('prospective_symbol',{'day':day,'symbol':symbol,'status':status,
+            'reason':reason,'processed':len(rows),'requested':len(PRESET)})
+        except Exception:pass
     try:
-        status,results=run(day,PRESET,fetch=lambda symbol:_payload(symbol,'스윙','kis',15),
-            record=record,existing=existing_for_day,now=lambda:datetime.now(KST),
-            calendar=krx_session,progress=progress)
+        status,results=run(day,PRESET,fetch=fetch,record=save,existing=existing_for_day,
+            now=lambda:datetime.now(KST),calendar=krx_session,progress=progress)
     except Exception:
         status='failed'
         with CORE561_LOCK:results=dict(CORE561_JOB.get('results') or {})
-    with CORE561_LOCK:CORE561_JOB.update(status=status,results=results)
-    try:emit('prospective_collection',{'day':day,'status':status,'requested':len(PRESET),
-        'counts':{k:sum(v==k for v in results.values()) for k in ACCEPTED},'orders_enabled':False})
+    audit=audit_day(day,PRESET)
+    if status=='complete' and (audit.get('status')!='READ_OK' or audit.get('verified_signals')!=len(PRESET)):
+        status='partial'
+    with CORE561_LOCK:CORE561_JOB.update(status=status,results=results,details=details,persistence=audit)
+    try:
+        emit('prospective_collection',{'day':day,'status':status,'requested':len(PRESET),
+            'counts':{k:sum(v==k for v in results.values()) for k in ACCEPTED},'orders_enabled':False})
+        emit('observation_day_audit',audit)
     except Exception:pass
 
 
@@ -1867,7 +1895,7 @@ def core566_collect(request:Request):
         return {'status':'skipped' if gate['reason']=='HOLIDAY' else 'blocked',**gate}
     with CORE561_LOCK:
         if CORE561_JOB['status']=='running':return {'status':'running','day':CORE561_JOB['day']}
-        CORE561_JOB.update(status='running',results={},day=day,reason=None)
+        CORE561_JOB.update(status='running',results={},details={},persistence=None,day=day,reason=None)
         threading.Thread(target=_core566_worker,args=(day,),daemon=True,name='nova-core566').start()
     return {'status':'running','day':day}
 
@@ -2007,6 +2035,12 @@ def _ops_startup():
             now=datetime.now(KST)
             emit('collection_gate_probe',inspect_gate(now.date().isoformat(),now,krx_session))
             emit('observation_probe',database_probe())
+        except Exception:pass
+        try:
+            from collection_audit import audit_day
+            from nova_v561_hierarchical import PRESET
+            day=datetime.now(KST).date().isoformat()
+            emit('observation_day_audit',audit_day(day,PRESET))
         except Exception:pass
     threading.Thread(target=probe,daemon=True,name='nova-checkpoint-probe').start()
     if os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1':_start_ops(True)
