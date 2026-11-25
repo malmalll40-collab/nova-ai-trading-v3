@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import re
+from numbers import Real
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,7 +33,11 @@ def configured():
 
 
 def num(x):
-    return x if type(x) in (int,float) and math.isfinite(x) else None
+    if isinstance(x, bool) or not isinstance(x, Real):return None
+    try:
+        value=float(x)
+        return (int(x) if isinstance(x, int) else value) if math.isfinite(value) else None
+    except (ValueError, TypeError, OverflowError):return None
 
 
 def day(x):
@@ -129,7 +134,32 @@ def progress_summary(phase, requested, finished, ready, elapsed, symbol=None, sy
             'symbol_elapsed_seconds':round(max(0,symbol_elapsed),1) if symbol_elapsed is not None else None}
 
 
+V570_STRATEGIES = ('core','strength','adaptive','hybrid','rs_required','transition_soft','rs_hybrid','risk_chase','range_guard','regime_switch','sideways_guard','v570')
+V570_FIELDS = ('trades','dates','symbols','hit_pct','mean_net_pct','median_net_pct','stress_mean_pct','tail10_pct','worst_pct','profit_factor')
+V570_REGIMES = ('strong_up','mild_up','sideways','up_transition','down','unknown')
+V570_MARKETS = ('up','range','down','unknown')
+V570_STATES = ('FILTERED','INSUFFICIENT_POOL','RESEARCH_CANDIDATE','RISK_OR_EV_HOLD')
+
+
+def accuracy_summary(data):
+    def mapping(x):return x if isinstance(x,dict) else {}
+    d=mapping(data)
+    base={'status':'READY' if d.get('status')=='READY' else 'UNAVAILABLE','historical_only':True,'strategy_adoption':'HOLD'}
+    if base['status']!='READY':return base
+    def fields(x,keys):return {k:num(mapping(x).get(k)) for k in keys}
+    def table(x):return {k:fields(v,V570_FIELDS) for k,v in mapping(x).items() if k in V570_STRATEGIES and isinstance(v,dict)}
+    def groups(x,keys):return {k:table(v) for k,v in mapping(x).items() if k in keys}
+    return {**base,'start':day(d.get('start')),'end':day(d.get('end')),'outcome_end':day(d.get('outcome_end')),
+            **fields(d,('cost_bps','completed','shadow_completed','market_known_completed')),
+            'strategies':table(d.get('strategies')),'guard_comparison':table(d.get('guard_comparison')),'shadow_comparison':table(d.get('shadow_comparison')),
+            'by_regime':groups(d.get('by_regime'),V570_REGIMES),'by_market':groups(d.get('by_market'),V570_MARKETS),'shadow_by_regime':groups(d.get('shadow_by_regime'),V570_REGIMES),
+            'changes':{k:fields(v,('blocked_wins','blocked_losses','added_wins','added_losses')) for k,v in mapping(d.get('changes')).items() if k in ('sideways_guard','v570')},
+            'calibration':fields(d.get('calibration'),('scored','brier','naive_brier')),'states':{k:num(v) for k,v in mapping(d.get('states')).items() if k in V570_STATES}}
+
+
 def batch_summary(state):
+    try:emit_accuracy(state)
+    except Exception:pass # reporting must not affect research
     rows=state.get('rows') or [];aligned=state.get('core542_aligned') or {};u=aligned.get('v561_unified') or {}
     portfolio=u.get('portfolio') or {}; groups=u.get('by_group') or {}
     def perf(p):return {k:num(p.get(k)) for k in ('return_pct','mdd_pct','trades','stress_return_pct')}
@@ -146,3 +176,12 @@ def batch_summary(state):
             'semiconductor_research_excluded':group(groups.get('연구 분류 반도체 제외') or {}),
             'nonoverlap_candidate_value':{k:{f:num(v.get(f)) for f in ('added_count','blocked_count','delta_pct_sum')} for k,v in (u.get('nonoverlap_candidate_value') or {}).items() if k in ('rs_required','entry_wider','risk_chase','transition_soft','rs_hybrid','regime_router','early_turn','range_guard','regime_switch') and isinstance(v,dict)},
             'historical_only':True,'strategy_adoption':'HOLD'}
+
+
+def emit_accuracy(state):
+    summary=accuracy_summary((state.get('core542_aligned') or {}).get('v570_accuracy'))
+    groups={k:summary.pop(k,{}) for k in ('by_regime','by_market','shadow_by_regime')}
+    emit('v570_historical',summary)
+    for kind,group in groups.items():
+        for regime,metrics in group.items():
+            emit('v570_historical_regime',{'kind':kind,'regime':regime,'metrics':metrics,'historical_only':True,'strategy_adoption':'HOLD'})
