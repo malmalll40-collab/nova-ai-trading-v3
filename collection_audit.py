@@ -135,7 +135,7 @@ def integrity_detail(payload):
     if isinstance(coverage,dict) and isinstance(coverage.get('reason'),str) and coverage['reason'] in CODES:
         d={'reason':coverage['reason']}
         if isinstance(coverage.get('stop'),str) and coverage['stop'] in STOPS:d['stop']=coverage['stop']
-        for k in ('pages','gap_pages','alternate_pages','required','received_required','missing_count','zero_volume_minutes','certified_zero_count','unresolved_count'):
+        for k in ('pages','gap_pages','alternate_pages','required','received_required','missing_count','zero_volume_minutes','certified_zero_count','unresolved_count','cumulative_field_missing_rows','cumulative_field_invalid_rows','cumulative_conflict_rows'):
             v=coverage.get(k)
             if type(v) is int and 0<=v<=1500:d[k]=v
         for k in ('open_present','close_present'):
@@ -148,7 +148,12 @@ def integrity_detail(payload):
             d['same_day_probe']={k:v for k,v in list(probe.items())[:4]
                 if isinstance(k,str) and re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',k)
                 and isinstance(v,str) and v in PROBE_CODES}
-        from kis_zero_gap import sanitized_proofs
+        from kis_zero_gap import sanitized_proofs, PROOF_CODES
+        reasons=coverage.get('zero_proof_diagnostics')
+        if isinstance(reasons,dict):
+            d['zero_proof_diagnostics']={k:v for k,v in list(reasons.items())[:5]
+                if isinstance(k,str) and (k=='overall' or re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',k))
+                and isinstance(v,str) and v in PROOF_CODES}
         proof=sanitized_proofs(coverage.get('zero_proofs'))
         if proof:d['zero_proofs']=proof
         detail['minute_coverage']=d

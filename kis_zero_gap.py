@@ -5,6 +5,11 @@ import math
 import pandas as pd
 
 MAX_ZERO_GAPS = 4
+PROOF_CODES = frozenset(('VERIFIED','GAP_LIMIT','NOT_SAME_DAY','TARGET_NOT_ZERO',
+    'NEIGHBOR_MISSING','CUMULATIVE_UNAVAILABLE','NEIGHBOR_VOLUME_INVALID',
+    'CUMULATIVE_DELTA_MISMATCH','CURSOR_UNSAFE','QUERY_FAILED','INVALID_RESPONSE',
+    'PROOF_ROW_MISSING','PROOF_ROW_DUPLICATE','PROOF_ROW_FIRST','TARGET_VOLUME_MISMATCH',
+    'NEIGHBOR_MISMATCH','ALTERNATE_CUMULATIVE_MISMATCH'))
 FIELDS = ('Open','High','Low','Close')
 WIRE = ('stck_oprc','stck_hgpr','stck_lwpr','stck_prpr')
 
@@ -26,48 +31,66 @@ def neighbor_matches(raw, expected):
     except (KeyError,TypeError,ValueError,OverflowError):return False
 
 
-def certify_zero_gaps(api, code, day, missing, close, rows, cumulative, comparison, *, now=None):
+def certify_zero_gaps(api, code, day, missing, close, rows, cumulative, comparison, diagnostics=None, *, now=None):
     """All-or-nothing proof using actual KIS rows and cumulative-volume conservation.
 
     Require isolated interior gaps, positive matching neighbor trades, a zero target
     in two same-day queries, and exact cumulative delta on the original endpoint.
     The first array row of the same-day endpoint is never used. No row is inserted.
     """
-    if not 0<len(missing)<=MAX_ZERO_GAPS:return {}
+    diagnostics = diagnostics if diagnostics is not None else {}
+    if not 0<len(missing)<=MAX_ZERO_GAPS:
+        diagnostics['overall']='GAP_LIMIT';return {}
     local=now or datetime.now(close.tz)
-    if local.astimezone(close.tz).date()!=day or pd.Timestamp(local)<close:return {}
+    if local.astimezone(close.tz).date()!=day or pd.Timestamp(local)<close:
+        diagnostics['overall']='NOT_SAME_DAY';return {}
     proofs={}; minute=pd.Timedelta(minutes=1); day_key=day.strftime('%Y%m%d')
     for target in missing:
         key=target.strftime('%H:%M'); prev=target-minute; nxt=target+minute
-        if comparison.get(key)!='TARGET_ZERO_VOLUME' or prev not in rows or nxt not in rows:return {}
+        if comparison.get(key)!='TARGET_ZERO_VOLUME':
+            diagnostics[key]='TARGET_NOT_ZERO';continue
+        if prev not in rows or nxt not in rows:
+            diagnostics[key]='NEIGHBOR_MISSING';continue
         a,b=cumulative.get(prev),cumulative.get(nxt)
         v=nonnegative_int(rows[nxt].get('Volume'))
-        if a is None or b is None or not v or rows[prev]['Volume']<=0 or a<rows[prev]['Volume'] or b-a!=v:return {}
-        # Cursor later than BOTH neighbors; reject a response that places any
-        # proof row first (KIS documents first-row execution-volume ambiguity).
+        if a is None or b is None:
+            diagnostics[key]='CUMULATIVE_UNAVAILABLE';continue
+        if not v or rows[prev]['Volume']<=0 or a<rows[prev]['Volume']:
+            diagnostics[key]='NEIGHBOR_VOLUME_INVALID';continue
+        if b-a!=v:
+            diagnostics[key]='CUMULATIVE_DELTA_MISMATCH';continue
         cursor=min(target+2*minute,close)
-        if cursor<=nxt:return {}
+        if cursor<=nxt:
+            diagnostics[key]='CURSOR_UNSAFE';continue
         try:
             response=api.get('/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice','FHKST03010200',{
                 'FID_COND_MRKT_DIV_CODE':'J','FID_INPUT_ISCD':code,'FID_INPUT_HOUR_1':cursor.strftime('%H%M%S'),
                 'FID_PW_DATA_INCU_YN':'N','FID_ETC_CLS_CODE':''})
-        except Exception:return {}
-        if not isinstance(response,dict) or not isinstance(response.get('output2'),list):return {}
-        chosen={}
+        except Exception:
+            diagnostics[key]='QUERY_FAILED';continue
+        if not isinstance(response,dict) or not isinstance(response.get('output2'),list):
+            diagnostics[key]='INVALID_RESPONSE';continue
+        chosen={}; failure=None
         for stamp in (prev,target,nxt):
             matches=[(i,r) for i,r in enumerate(response['output2']) if isinstance(r,dict)
                      and r.get('stck_bsop_date')==day_key and r.get('stck_cntg_hour')==stamp.strftime('%H%M%S')]
-            if len(matches)!=1 or matches[0][0]==0:return {}
+            if not matches:failure='PROOF_ROW_MISSING';break
+            if len(matches)!=1:failure='PROOF_ROW_DUPLICATE';break
+            if matches[0][0]==0:failure='PROOF_ROW_FIRST';break
             chosen[stamp]=matches[0][1]
-        if nonnegative_int(chosen[target].get('cntg_vol'))!=0:return {}
-        if not neighbor_matches(chosen[prev],rows[prev]) or not neighbor_matches(chosen[nxt],rows[nxt]):return {}
-        # If the alternate endpoint supplies cumulative volume, it must agree.
-        for stamp,expected in ((prev,a),(target,a),(nxt,b)):
-            raw=chosen[stamp]
-            if 'acml_vol' in raw and nonnegative_int(raw['acml_vol'])!=expected:return {}
+        if failure:
+            diagnostics[key]=failure;continue
+        if nonnegative_int(chosen[target].get('cntg_vol'))!=0:
+            diagnostics[key]='TARGET_VOLUME_MISMATCH';continue
+        if not neighbor_matches(chosen[prev],rows[prev]) or not neighbor_matches(chosen[nxt],rows[nxt]):
+            diagnostics[key]='NEIGHBOR_MISMATCH';continue
+        if any('acml_vol' in chosen[stamp] and nonnegative_int(chosen[stamp]['acml_vol'])!=expected
+               for stamp,expected in ((prev,a),(target,a),(nxt,b))):
+            diagnostics[key]='ALTERNATE_CUMULATIVE_MISMATCH';continue
         proofs[key]={'prev':prev.strftime('%H:%M'),'next':nxt.strftime('%H:%M'),
                      'prev_cumulative':a,'next_cumulative':b,'next_volume':v,'target_volume':0}
-    return proofs
+        diagnostics[key]='VERIFIED'
+    return proofs if len(proofs)==len(missing) else {}
 
 
 def sanitized_proofs(value):
