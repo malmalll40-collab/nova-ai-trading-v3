@@ -35,7 +35,7 @@ def feature_vector(f,i,market,ind):
 def cohort(r,name):
     if name=='core':return r['core']
     # Separate experimental population, never an order/entry signal.
-    return r['market']=='range' and r['regime'] in REGIMES[:4] and not r['risk_veto']
+    return r['market']=='range' and r['regime'] in REGIMES[:4] and r['stock_risk_ok'] is True
 
 
 def sigmoid(z):return 1/(1+np.exp(-np.clip(z,-22,22)))
@@ -141,7 +141,7 @@ def historical(frames,symbols,horizon,cost):
             if not np.isfinite(net) or net<=-100:raise ValueError('invalid outcome')
             rows.append({'day':day,'exit_day':dates[i+horizon],'symbol':symbol,'x':x,'net_pct':net,
                 'core':p['signals'].get('core')=='BUY','market':p.get('market_regime'),
-                'regime':p.get('subregime'),'risk_veto':p.get('route')=='risk_veto'})
+                'regime':p.get('subregime'),'stock_risk_ok':p.get('ml_stock_risk_ok') is True})
     result={}
     for name in COHORTS:
         candidates=[r for r in rows if cohort(r,name)];preds={};folds=[]
