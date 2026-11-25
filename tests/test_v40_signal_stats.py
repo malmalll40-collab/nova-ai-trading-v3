@@ -101,7 +101,7 @@ def test_api_no_orders_still_auth_and_research_does_not_change_signal(monkeypatc
     monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
     testclient=TestClient(server.app)
     v=testclient.get('/healthz').json()
-    assert v['app_version']=='5.6.5' and v['signal_role_statistics'] is True
+    assert v['app_version']=='5.6.6' and v['signal_role_statistics'] is True
     assert v['calibrated_buy_probability'] is False and v['orders_enabled'] is False
     body=testclient.get('/api/analysis?source=demo&mode=스윙&cost_bps=15').json()
     assert len(body['signal_performance']['roles'])==10

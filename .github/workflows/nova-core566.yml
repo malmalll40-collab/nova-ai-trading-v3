@@ -1,0 +1,19 @@
+name: NOVA prospective daily research (no orders)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 9,11 * * 1-5'
+permissions:
+  contents: read
+concurrency:
+  group: nova-prospective-observation
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NOVA_AUTOTRACK_TOKEN: ${{ secrets.NOVA_AUTOTRACK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/scripts/nova_core566_ping.py

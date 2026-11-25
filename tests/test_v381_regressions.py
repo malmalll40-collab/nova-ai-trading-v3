@@ -159,7 +159,7 @@ def test_frontend_alert_finance_independent_and_journal_safety():
 def test_health_pwa_version_and_no_orders():
     client=TestClient(server.app)
     d=client.get('/healthz').json()
-    assert d['app_version']=='5.6.5' and d['orders_enabled'] is False
+    assert d['app_version']=='5.6.6' and d['orders_enabled'] is False
     assert d['intraday_journal_verified'] is False
     assert 'nova3-shell-v45' in client.get('/sw.js').text
     assert 'id="view-guide"' in client.get('/').text

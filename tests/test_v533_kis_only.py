@@ -68,7 +68,7 @@ def test_public_routes_reject_legacy_yahoo(monkeypatch):
     for path in ['/api/analysis','/api/chart/history','/api/research/v5']:
         r=c.get(path+'?symbol=005930.KS&source=yahoo',headers=h)
         assert r.status_code==422,(path,r.status_code)
-    assert server.healthz()['kis_only_analysis'] and server.healthz()['app_version']=='5.6.5'
+    assert server.healthz()['kis_only_analysis'] and server.healthz()['app_version']=='5.6.6'
 
 def test_auto_source_never_falls_back(monkeypatch):
     import server

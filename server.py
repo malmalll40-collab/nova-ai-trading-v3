@@ -513,7 +513,7 @@ def service_worker():
 
 @app.get('/healthz')
 def healthz():
-    return {'status':'ok','orders_enabled':False,'app_version':'5.6.5','ops_diagnostics':True,'v561_research':True,'v561_live_adoption':False,'v560_research':True,'v560_live_adoption':False,'v552_research':True,'v552_live_adoption':False,'analysis_chart_live':True,'v550_research':True,'v550_live_adoption':False,'analysis_modes':['1분','5분','15분','스윙'],'higher_trend_context_research_only':True,'release_tag':'4.5-stability-20261112','feature_tag':'4.5-domestic-only-20261112','scan_freshness_tag':'4.5-session-aware-rejection-20261112','flow_history_tag':'4.5-nav-flow-per-investor-20261112','stock_name_search':True,'dart_feature':True,'financial_risk_filter':True,'historical_fundamental_backtest':False,'forward_signal_journal':True,'evidence_lab_version':'4.7.0-auto-research','persistent_server_journal':evidence_backend()!='disabled','watchlist_visible_tab_only':True,'push_notifications':False,'strict_signal_quality':True,'quality_hit_rate_verified':False,'final_signal_policy':'financial-then-notification','intraday_journal_verified':False,'candlestick_chart':True,'stock_news':True,'news_affects_signal':False,'signal_role_statistics':True,'calibrated_buy_probability':False,'higher_timeframe_charts':True,'higher_timeframes_affect_signal':False,'market_recommendations':True,'nasdaq_search':False,'nasdaq_watchlist_scan':False,'us_tickers_enabled':False,'korean_market_only':True,'market_scope_tag':'4.5-domestic-only-20261112','domestic_interest_candidates':True,'market_scan_requires_krx_api':False,'market_scan_fsc_tplus1':True,'realtime_market_scan':False,'server_persistent_scan_results':evidence_backend()!='disabled','historical_market_screen_backtest':True,'full_recommendation_strategy_backtested':False,'high_precision_adoption_mode':'SHADOW_ONLY','high_precision_live_validated':False,'shadow_context_tag':'5.3.4-kis-index-etf-proxy','investor_flows_daily':True,'investor_flows_naver_fallback':True,'structure_levels_research_only':True,'krx_market_calendar':'XKRX_with_verified_special_hours','quote_rest_polling':True,'realtime_quote_websocket':False,'kis_ws_optional_readonly':True,'kis_ws_enabled':kis_ws_status()['enabled'],'v54_walk_forward_accuracy':True,'v542_hybrid_research':True,'v542_hybrid_live_adoption':False,'v541_core_adaptive_research':True,'v541_core_live_adoption':False,'v54_live_adoption':False,'v5_lab_enabled':True,'v51_batch_research':True,'v51_trade_ledger':True,'v52_risk_audit':True,'v52_filters_live_adopted':False,'v521_aligned_backtest':True,'v521_calendar_diagnostics':True,'v53_evidence_gate':True,'v53_shadow_role_groups':True,'v53_live_adoption':False,'v531_price_source_audit':True,'v532_kis_session_integrity_guard':True,'v532_kis_cross_checked_requery':True,'v531_price_reconciliation_live_adopted':False,'v5_ai_auto_adoption':False,'v5_ml_probability_calibrated':False,'v5_ui_tabs':6,'kis_period_rest_polling':True,'kis_period_native_ohlcv':True,'auto_swing_kis_first':True,'kis_regular_ohlcv_reconstruction':True,'kis_only_analysis':True,'yahoo_manual_audit_only':True,'completed_session_freshness':True,'kis_period_refresh_seconds':20,'domestic_activity_top20':True,'naver_popular_official_link_only':True,'recommendation_breadth':'24-48-60','market_regime_research':'observed_only_shadow_v47','market_regime_live_adoption':False,'candle_research_history':True,'core_comparison_research_only':True,'core_live_adoption':False,'strict_buy_policy_unchanged':True,'investor_flow_research_only':True,'recommendation_ui_release':'2026-11-20-status-rank-cachefix'}
+    return {'status':'ok','orders_enabled':False,'app_version':'5.6.6','ops_diagnostics':True,'v561_research':True,'v561_live_adoption':False,'v560_research':True,'v560_live_adoption':False,'v552_research':True,'v552_live_adoption':False,'analysis_chart_live':True,'v550_research':True,'v550_live_adoption':False,'analysis_modes':['1분','5분','15분','스윙'],'higher_trend_context_research_only':True,'release_tag':'4.5-stability-20261112','feature_tag':'4.5-domestic-only-20261112','scan_freshness_tag':'4.5-session-aware-rejection-20261112','flow_history_tag':'4.5-nav-flow-per-investor-20261112','stock_name_search':True,'dart_feature':True,'financial_risk_filter':True,'historical_fundamental_backtest':False,'forward_signal_journal':True,'evidence_lab_version':'4.7.0-auto-research','persistent_server_journal':evidence_backend()!='disabled','watchlist_visible_tab_only':True,'push_notifications':False,'strict_signal_quality':True,'quality_hit_rate_verified':False,'final_signal_policy':'financial-then-notification','intraday_journal_verified':False,'candlestick_chart':True,'stock_news':True,'news_affects_signal':False,'signal_role_statistics':True,'calibrated_buy_probability':False,'higher_timeframe_charts':True,'higher_timeframes_affect_signal':False,'market_recommendations':True,'nasdaq_search':False,'nasdaq_watchlist_scan':False,'us_tickers_enabled':False,'korean_market_only':True,'market_scope_tag':'4.5-domestic-only-20261112','domestic_interest_candidates':True,'market_scan_requires_krx_api':False,'market_scan_fsc_tplus1':True,'realtime_market_scan':False,'server_persistent_scan_results':evidence_backend()!='disabled','historical_market_screen_backtest':True,'full_recommendation_strategy_backtested':False,'high_precision_adoption_mode':'SHADOW_ONLY','high_precision_live_validated':False,'shadow_context_tag':'5.3.4-kis-index-etf-proxy','investor_flows_daily':True,'investor_flows_naver_fallback':True,'structure_levels_research_only':True,'krx_market_calendar':'XKRX_with_verified_special_hours','quote_rest_polling':True,'realtime_quote_websocket':False,'kis_ws_optional_readonly':True,'kis_ws_enabled':kis_ws_status()['enabled'],'v54_walk_forward_accuracy':True,'v542_hybrid_research':True,'v542_hybrid_live_adoption':False,'v541_core_adaptive_research':True,'v541_core_live_adoption':False,'v54_live_adoption':False,'v5_lab_enabled':True,'v51_batch_research':True,'v51_trade_ledger':True,'v52_risk_audit':True,'v52_filters_live_adopted':False,'v521_aligned_backtest':True,'v521_calendar_diagnostics':True,'v53_evidence_gate':True,'v53_shadow_role_groups':True,'v53_live_adoption':False,'v531_price_source_audit':True,'v532_kis_session_integrity_guard':True,'v532_kis_cross_checked_requery':True,'v531_price_reconciliation_live_adopted':False,'v5_ai_auto_adoption':False,'v5_ml_probability_calibrated':False,'v5_ui_tabs':6,'kis_period_rest_polling':True,'kis_period_native_ohlcv':True,'auto_swing_kis_first':True,'kis_regular_ohlcv_reconstruction':True,'kis_only_analysis':True,'yahoo_manual_audit_only':True,'completed_session_freshness':True,'kis_period_refresh_seconds':20,'domestic_activity_top20':True,'naver_popular_official_link_only':True,'recommendation_breadth':'24-48-60','market_regime_research':'observed_only_shadow_v47','market_regime_live_adoption':False,'candle_research_history':True,'core_comparison_research_only':True,'core_live_adoption':False,'strict_buy_policy_unchanged':True,'investor_flow_research_only':True,'recommendation_ui_release':'2026-11-20-status-rank-cachefix'}
 
 @app.get('/api/status')
 def status(request:Request):
@@ -1823,6 +1823,73 @@ def core561_job(request:Request):
     _auto_auth(request)
     with CORE561_LOCK:return dict(CORE561_JOB)
 
+# v5.6.6: independent scheduler opt-in; legacy auto endpoints remain unchanged.
+def _core566_auth(request: Request):
+    from core561_evidence import enabled
+    token=os.environ.get('NOVA_AUTOTRACK_TOKEN','')
+    if os.environ.get('NOVA_CORE566_AUTO_ENABLED')!='1' or len(token)<24 or not enabled():
+        raise HTTPException(503,'전향 수집 예약 실행 설정 필요')
+    if not hmac.compare_digest(request.headers.get('X-Nova-Autotrack-Token',''),token):
+        raise HTTPException(401,'전향 수집 예약 인증 실패')
+
+
+def _core566_worker(day):
+    from prospective_collection import run, existing_for_day, ACCEPTED
+    from core561_evidence import record
+    from nova_v561_hierarchical import PRESET
+    from ops_diagnostics import emit
+    results={}
+    def progress(rows):
+        with CORE561_LOCK:CORE561_JOB['results']=rows
+    try:
+        status,results=run(day,PRESET,fetch=lambda symbol:_payload(symbol,'스윙','kis',15),
+            record=record,existing=existing_for_day,now=lambda:datetime.now(KST),
+            calendar=krx_session,progress=progress)
+    except Exception:
+        status='failed'
+        with CORE561_LOCK:results=dict(CORE561_JOB.get('results') or {})
+    with CORE561_LOCK:CORE561_JOB.update(status=status,results=results)
+    try:emit('prospective_collection',{'day':day,'status':status,'requested':len(PRESET),
+        'counts':{k:sum(v==k for v in results.values()) for k in ACCEPTED},'orders_enabled':False})
+    except Exception:pass
+
+
+@app.post('/api/research/core566/collect')
+def core566_collect(request:Request):
+    from prospective_collection import permitted
+    _core566_auth(request)
+    now=datetime.now(KST);day=now.date().isoformat()
+    if not permitted(day,now,krx_session):return {'status':'skipped','day':day}
+    with CORE561_LOCK:
+        if CORE561_JOB['status']=='running':return {'status':'running','day':CORE561_JOB['day']}
+        CORE561_JOB.update(status='running',results={},day=day,reason=None)
+        threading.Thread(target=_core566_worker,args=(day,),daemon=True,name='nova-core566').start()
+    return {'status':'running','day':day}
+
+
+@app.get('/api/research/core566/job')
+def core566_job(request:Request):
+    _core566_auth(request)
+    with CORE561_LOCK:return dict(CORE561_JOB)
+
+
+@app.get('/api/research/core566/status')
+def core566_status(request:Request):
+    _authorize(request);_limit(request)
+    from core561_evidence import enabled
+    from prospective_collection import existing_for_day
+    day=datetime.now(KST).date().isoformat()
+    with CORE561_LOCK:job=dict(CORE561_JOB)
+    configured=os.environ.get('NOVA_CORE566_AUTO_ENABLED')=='1' and len(os.environ.get('NOVA_AUTOTRACK_TOKEN',''))>=24 and enabled()
+    # Do not create tables during a disabled status check.
+    results={};state='DISABLED'
+    if configured:
+        try:results=existing_for_day(day);state='READ_OK'
+        except Exception:state='READ_FAILED'
+    return {'configured':configured,'day':day,'persistent_status':state,'verified_signals':sum(v=='EXISTS' for v in results.values()),
+        'price_only':sum(v=='PRICE_ONLY' for v in results.values()),'job':job,'orders_enabled':False,'strategy_adoption':'HOLD'}
+
+
 @app.get('/api/research/core561/evidence')
 def core561_report(request:Request,symbol:str='005930.KS'):
     _authorize(request);_limit(request)
@@ -1925,6 +1992,11 @@ def _start_ops(full=True):
 def _ops_startup():
     from ops_diagnostics import configured, emit
     emit('startup',configured())
+    def probe():
+        from prospective_collection import checkpoint_probe
+        try:emit('checkpoint_probe',checkpoint_probe())
+        except Exception:pass
+    threading.Thread(target=probe,daemon=True,name='nova-checkpoint-probe').start()
     if os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1':_start_ops(True)
 
 

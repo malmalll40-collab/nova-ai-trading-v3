@@ -62,5 +62,5 @@ def test_new_mobile_ui_and_service_worker():
     assert 'rememberDevice' in html and 'logoutButton' in html
     assert '/api/auth/login' in js and '/api/auth/status' in js and '/api/auth/logout' in js
     assert 'nova3-shell-v45' in Path(server.ASSETS/'sw.js').read_text()
-    assert 'Trading Mobile v5.6.5' in html
+    assert 'Trading Mobile v5.6.6' in html
     assert server.app.title == 'NOVA AI Trading Mobile'
