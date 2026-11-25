@@ -122,7 +122,7 @@ def test_scanner_scan_does_not_change_decisions(monkeypatch):
     # New calls use separate read-only reporting/storage modules; never place orders.
     status=TestClient(app).get('/healthz').json()
     assert status['orders_enabled'] is False
-    assert status['app_version']=='5.6.8'
+    assert status['app_version']=='5.7.0'
 
 
 def test_observed_user_signal_prospective_close_recording(tmp_path,monkeypatch):

@@ -7,7 +7,7 @@ import server
 
 def test_release_features_are_present_without_orders():
     d=TestClient(server.app).get('/healthz').json()
-    assert d['app_version']=='5.6.8'
+    assert d['app_version']=='5.7.0'
     assert d['auto_swing_kis_first'] is True
     assert d['completed_session_freshness'] is True
     assert d['evidence_lab_version']=='4.7.0-auto-research'

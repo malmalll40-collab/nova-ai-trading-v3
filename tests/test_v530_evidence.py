@@ -113,7 +113,7 @@ def test_batch_shows_separate_stock_counts_not_aggregated_portfolio_returns():
 def test_research_uses_extended_benchmark_and_never_changes_live_endpoints(monkeypatch):
     import server
     from pathlib import Path
-    assert server.healthz()['app_version']=='5.6.8'
+    assert server.healthz()['app_version']=='5.7.0'
     assert not server.healthz()['v53_live_adoption']
     assert 'id="v53DecisionGate"' in (server.ASSETS/'index.html').read_text()
     assert 'renderV53' in (server.ASSETS/'v5_dashboard.js').read_text()

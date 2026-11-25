@@ -136,7 +136,7 @@ def test_fastapi_requires_auth_and_key(monkeypatch):
     r=TestClient(server.app).get('/api/fundamentals?symbol=123456.KQ',headers={'Authorization':'Bearer '+'Z'*22})
     assert r.status_code==503
     assert r.json()['detail']['code']=='no_key'
-    assert TestClient(server.app).get('/healthz').json()['app_version']=='5.6.8'
+    assert TestClient(server.app).get('/healthz').json()['app_version']=='5.7.0'
 
 
 def test_fastapi_finance_fixture(monkeypatch):

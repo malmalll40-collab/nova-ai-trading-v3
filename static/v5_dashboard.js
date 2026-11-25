@@ -433,7 +433,7 @@ function batchDisplay(state){
  const cand=el('details','v53-item');cand.append(el('summary','','v5.5.2 개선 후보 및 Hybrid 등급별 공통기간 성적'));for(const [k,n] of Object.entries(core543Names)){const x=a.candidates?.[k];if(x)cand.append(el('p','v51-batch-meta',`${n} · 평균 ${percent(x.mean_pct)} · 평균 MDD ${percent(x.mean_mdd_pct)} · ${x.trades}거래 · 수익 종목 ${x.positive_stocks} · 적중 ${unsignedPct(x.precision_pct)} · 비용 2배 ${percent(x.stress_mean_pct)}`));}for(const [k,x] of Object.entries(a.grades||{}))cand.append(el('p','v51-batch-meta',`Hybrid ${k}등급 단독 진입 · ${x.trades}거래 · 평균 ${percent(x.mean_pct)} · 평균 MDD ${percent(x.mean_mdd_pct)} · 적중 ${unsignedPct(x.precision_pct)}`));cand.append(el('p','v5-note','사전 고정 후보 · 기존 표본 재사용 연구 · 독립 미래 검증 아님. 자동 채택 없음.'));panel.append(cand);
  const audit=el('details','v53-item');audit.append(el('summary','','v5.5 공통기간 기회 및 횡보/전환 성과'));
  for(const [k,z] of Object.entries(a.candidate_changes||{}))audit.append(el('p','v51-batch-meta',`${core543Names[k]||k} · 추가 수익/손실 ${z.added_positive}/${z.added_negative} · 차단 수익/손실 ${z.blocked_positive}/${z.blocked_negative}`));
- for(const [r,v] of Object.entries(a.v550_regimes||{}))for(const [k,x] of Object.entries(v))audit.append(el('p','v51-batch-meta',`${r} · ${core543Names[k]} · ${x.evaluated_stock_days??0} 종목-일 · ${x.trades??0}거래 · 평균 ${percent(x.mean_pct)} · 비용2배 ${percent(x.stress_mean_pct)}`));panel.append(audit,overlapPanel(a.v552_overlap),unifiedBatch(a.v561_unified));
+ for(const [r,v] of Object.entries(a.v550_regimes||{}))for(const [k,x] of Object.entries(v))audit.append(el('p','v51-batch-meta',`${r} · ${core543Names[k]} · ${x.evaluated_stock_days??0} 종목-일 · ${x.trades??0}거래 · 평균 ${percent(x.mean_pct)} · 비용2배 ${percent(x.stress_mean_pct)}`));panel.append(audit,overlapPanel(a.v552_overlap),unifiedBatch(a.v561_unified),renderV570(a.v570_accuracy));
  for(const [k,r] of Object.entries(a.regimes||{})){const names={strong_up:'강한 상승',mild_up:'완만한 상승',range:'횡보·전환',down:'하락',sideways:'횡보',up_transition:'상승 전환'};panel.append(el('p','v51-batch-meta',`${names[k]} · `+Object.entries(coreNames).map(([m,n])=>`${n} ${percent(r[m]?.mean_pct)} (${r[m]?.trades??0}건)`).join(' / ')));}
  const detail=el('details','v53-item');detail.append(el('summary','','종목별 공통기간 성적'));for(const r of a.strategies.core.per_stock||[]){detail.append(el('p','v51-batch-meta',`${knownStockNames[r.symbol]||r.symbol} · `+Object.entries(coreNames).map(([m,n])=>`${n} ${percent(a.strategies[m].per_stock?.find(x=>x.symbol===r.symbol)?.return_pct)}`).join(' / ')));}panel.append(detail,el('p','v5-note',a.limitations));}box.prepend(panel);
  }
@@ -646,7 +646,37 @@ function onViewChange(view){
  if(menu)menu.hidden=true;if(more){more.setAttribute('aria-expanded','false');more.classList.toggle('active',['finance','news','guide'].includes(view));}
  if(view!=='research'&&socket)stopSocket('종목 분석 화면을 벗어나 실시간 관찰을 종료했습니다.');
 }
+function renderV570(d){
+ const box=el('div','v531-audit');box.append(el('strong','','v5.7.0 판단 정확도 · 위험 검증'));
+ if(!d||d.status!=='READY'){box.append(el('p','v5-note',d?.reason||'검증 자료 없음'));return box;}
+ const labels={core:'기존 5-Core',strength:'추세 강도',adaptive:'Adaptive',hybrid:'Hybrid',rs_required:'상대강도',transition_soft:'전환 완화',rs_hybrid:'RS Hybrid',risk_chase:'추격 완화',range_guard:'횡보 돌파 방어',regime_switch:'국면 전환',sideways_guard:'강화 진입 필터',v570:'v5.7.0 연구 판단'};
+ const names={strong_up:'강한 상승',mild_up:'완만한 상승',sideways:'횡보',up_transition:'상승 전환',down:'하락',up:'지수 상승',range:'지수 횡보',unknown:'미확인'};
+ const past=d.basis==='HISTORICAL_CAUSAL_REPLAY';
+ box.append(el('p','v5-note',past?'과거 시간순 재현 · 사후 연구이며 미래 독립 검증 아님':('Neon 기록 '+(d.verified_records??0)+'개 · 관찰 '+(d.observed_days??0)+'일 · 완료 '+(d.completed??0)+' · 대기 '+(d.pending??0)+' · 누락 '+(d.missing_outcomes??0)+' · 신규 판단 기록 '+(d.shadow_frozen??0))));
+ box.append(el('p','v5-note','검증 '+d.validation_state+' · 비용 편도 '+d.cost_bps+'bp · Brier '+(d.calibration?.brier??'표본 부족')+' / 기준 '+(d.calibration?.naive_brier??'표본 부족')+' · 확률 평가 '+(d.calibration?.scored??0)+'건'));
+ const renderTable=(title,data,parent=box)=>{
+   parent.append(el('strong','',title));
+   for(const [k,x] of Object.entries(data||{}))parent.append(el('p','v51-batch-meta',`${labels[k]||k} · ${x.trades}건 / ${x.dates}일 · 적중 ${unsignedPct(x.hit_pct)} · 평균 순수익 ${percent(x.mean_net_pct)} · 비용2배 ${percent(x.stress_mean_pct)} · 하위10% 평균 ${percent(x.tail10_pct)} · 최악 ${percent(x.worst_pct)} · 손익비 ${x.profit_factor??'미확인'}`));
+ };
+ renderTable('기존 전략별 비중첩 기회',d.strategies);
+ renderTable('동일 자료 · 강화 진입 필터 비교',d.guard_comparison);
+ renderTable('동일 신규 예측 표본 · 기존 대 신규',d.shadow_comparison);
+ for(const [title,data] of [['종목 국면별 기존 전략',d.by_regime],['시장지수 국면별 기존 전략',d.by_market],['신규 판단의 종목 국면별 비교',d.shadow_by_regime]]){
+   const details=el('details');details.append(el('summary','',title));
+   for(const [g,v] of Object.entries(data||{}))renderTable(names[g]||g,v,details);
+   box.append(details);
+ }
+ for(const [k,v] of Object.entries(d.changes||{}))box.append(el('p','v5-note',`${labels[k]||k} · 차단 이익 ${v.blocked_wins} / 비양수 ${v.blocked_losses} · 추가 이익 ${v.added_wins} / 비양수 ${v.added_losses}`));
+ box.append(el('p','v5-note',d.limitations||'연구 전용 · 자동 채택 없음'));return box;
+}
+async function runV570(){
+ const btn=byId('v570ReportRun'),box=byId('v570ReportResult');if(!btn||!box)return;
+ btn.disabled=true;box.textContent='검증 자료 조회 중…';
+ try{const r=await fetch('/api/research/core570/report',{credentials:'same-origin',cache:'no-store'});const d=await r.json();if(!r.ok)throw Error(d.detail||'조회 실패');box.replaceChildren(renderV570(d));}
+ catch(e){box.textContent=errMsg(e.message);}finally{btn.disabled=false;}
+}
 function init(){
+ byId('v570ReportRun')?.addEventListener('click',runV570);
  byId('core560EvidenceRun')?.addEventListener('click',()=>unifiedEvidence());byId('core560LegacyRun')?.addEventListener('click',()=>unifiedEvidence(true));if(byId('core560EvidenceRun'))byId('core560EvidenceRun').disabled=!current;
  byId('core560StatusRun')?.addEventListener('click',unifiedStatus);
  byId('core541EvidenceRun')?.addEventListener('click',()=>coreEvidence(false));

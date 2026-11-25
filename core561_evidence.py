@@ -17,6 +17,8 @@ def snapshot(a,now):
     s=base_snapshot(a,now)
     if s is None:return None
     s.update(version=VERSION,id=f'{VERSION}|{s["symbol"]}|{s["day"]}',risk_veto=s.get('route')=='risk_veto' or s.get('subregime')=='down')
+    market=(a.get('core541_current') or {}).get('market_regime')
+    s['market_regime']=market if s['signals'] and market in ('up','range','down') else None
     coverage=(a.get('daily_integrity') or {}).get('minute_coverage') or {}
     if coverage.get('zero_proofs'):
         from collection_audit import integrity_detail
@@ -49,6 +51,13 @@ def record(a,now=None):
             prior.sort(key=lambda r:r['day']);by={r['day']:r for r in prior};results=_outcomes(prior,now)
             history.extend({**by[r['day']],'exit_day':r['exit_day'],'net_pct':r['net_return_pct']} for r in (results or []) if r['state']=='COMPLETE' and r['exit_day']<s['day'])
         s['unified']=choose(s,history);s['probability']=None
+        # Only new, immutable observations; existing observations are never rewritten.
+        if s['symbol'] in PRESET and s['signals']:
+            try:
+                from nova_v570_accuracy import choose as choose570
+                s['v570']=choose570(s,history,cost=s['cost_bps'])
+            except Exception:
+                s['v570_error']='SHADOW_COMPUTE_FAILED'
         sql=f'INSERT INTO {TABLE}(id,symbol,trading_day,observed_at,payload) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING'
         cur.execute(sql.replace('?','%s') if kind=='postgresql' else sql,(s['id'],s['symbol'],s['day'],s['observed_at'],json.dumps(s,ensure_ascii=False,sort_keys=True)));ok=cur.rowcount>0;db.commit()
         return ('SAVED' if s['signals'] else 'PRICE_ONLY') if ok else 'EXISTS'
