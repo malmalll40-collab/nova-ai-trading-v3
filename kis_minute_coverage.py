@@ -4,6 +4,7 @@ import math
 import pandas as pd
 from kis_gap_probe import alternate_queries, compare_same_day
 from kis_zero_gap import certify_zero_gaps, nonnegative_int
+from kis_turnover_proof import amount, verify as verify_turnover, CODES as TURNOVER_CODES
 
 MAX_PAGES = 12
 MAX_GAP_PAGES = 4
@@ -16,7 +17,7 @@ STOPS = frozenset(('REACHED_OPEN','EMPTY_PAGE','CURSOR_STALLED','PAGE_LIMIT','NO
 
 def collect(api, code, day, start, close):
     rows = {}; pages = 0; gaps = 0; stop = 'NOT_STARTED'
-    alternate = 0; comparison = {}; cumulative = {}; zero_proofs = {}; proof_diagnostics = {}; cumulative_missing = set(); cumulative_invalid = set(); cumulative_conflict = set()
+    alternate = 0; comparison = {}; cumulative = {}; zero_proofs = {}; proof_diagnostics = {}; cumulative_missing = set(); cumulative_invalid = set(); cumulative_conflict = set(); cumulative_present = set(); turnover = {}; turnover_conflict = set()
     expected = list(pd.date_range(start, close-pd.Timedelta(minutes=11), freq='min')) + [close]
     day_key = day.strftime('%Y%m%d')
     def diagnostic(reason):
@@ -26,7 +27,9 @@ def collect(api, code, day, start, close):
                 'zero_proofs':zero_proofs,'zero_proof_diagnostics':proof_diagnostics,
                 'cumulative_field_missing_rows':len(cumulative_missing),
                 'cumulative_field_invalid_rows':len(cumulative_invalid),
-                'cumulative_conflict_rows':len(cumulative_conflict),'certified_zero_count':len(zero_proofs),
+                'cumulative_conflict_rows':len(cumulative_conflict),
+                'turnover_available_rows':sum(v is not None for v in turnover.values()),
+                'turnover_conflict_rows':len(turnover_conflict),'certified_zero_count':len(zero_proofs),
                 'unresolved_count':len(missing)-len(zero_proofs),
                 'required':len(expected),'received_required':len(expected)-len(missing),
                 'missing_count':len(missing),'missing_minutes':[t.strftime('%H:%M') for t in missing],
@@ -55,6 +58,11 @@ def collect(api, code, day, start, close):
             if not math.isfinite(volume) or volume<0 or not volume.is_integer():return [], 'INVALID_VOLUME'
             val['Volume']=volume
             if stamp in rows and rows[stamp]!=val:return [], 'CONFLICTING_DUPLICATE'
+            if 'acml_vol' in x:cumulative_present.add(stamp)
+            money=amount(x.get('acml_tr_pbmn'))
+            if stamp in turnover and turnover[stamp]!=money:
+                turnover_conflict.add(stamp);turnover[stamp]=None
+            elif stamp not in turnover:turnover[stamp]=money
             cum=nonnegative_int(x.get('acml_vol'))
             if 'acml_vol' not in x:cumulative_missing.add(stamp)
             elif cum is None:cumulative_invalid.add(stamp)
@@ -92,6 +100,18 @@ def collect(api, code, day, start, close):
     if missing:
         comparison=compare_same_day(api,code,day,missing,close)
         zero_proofs=certify_zero_gaps(api,code,day,missing,close,rows,cumulative,comparison,proof_diagnostics)
+        # The alternate route is allowed only for a truly unsupported field,
+        # never to override a conflicting or invalid reported share count.
+        if (not zero_proofs and 0<len(missing)<=4 and not cumulative_present
+                and not cumulative_invalid and not cumulative_conflict
+                and all(proof_diagnostics.get(t.strftime('%H:%M'))=='CUMULATIVE_UNAVAILABLE' for t in missing)):
+            candidate={}
+            for t in missing:
+                key=t.strftime('%H:%M')
+                proof,why=verify_turnover(api,code,day,t,close,rows,turnover,comparison)
+                proof_diagnostics[key]=why
+                if proof:candidate[key]=proof
+            if len(candidate)==len(missing):zero_proofs=candidate
         if len(zero_proofs)!=len(missing):return None,diagnostic('COVERAGE_MISSING')
     if rows[start]['Volume']<=0 or rows[close]['Volume']<=0:return None,diagnostic('OPEN_CLOSE_VOLUME_INVALID')
     executed=[v for v in rows.values() if v['Volume']>0]

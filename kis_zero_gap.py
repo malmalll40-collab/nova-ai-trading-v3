@@ -104,6 +104,12 @@ def sanitized_proofs(value):
     try:
         for t,p in value.items():
             if not isinstance(p,dict) or minutes(p['prev'])!=minutes(t)-1 or minutes(p['next'])!=minutes(t)+1:return {}
+            if 'method' in p:
+                from kis_turnover_proof import sanitize
+                normalized=sanitize(p)
+                if normalized is None:return {}
+                clean[t]=normalized
+                continue
             a,b,v,z=[p[k] for k in ('prev_cumulative','next_cumulative','next_volume','target_volume')]
             if any(type(x) is not int or not 0<=x<=10**15 for x in (a,b,v,z)) or not v or z!=0 or b-a!=v:return {}
             clean[t]={'prev':p['prev'],'next':p['next'],'prev_cumulative':a,'next_cumulative':b,'next_volume':v,'target_volume':z}
