@@ -1,0 +1,12 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('static/candles.js','utf8').replace('window.NOVACandles={draw,render,valid,selectPeriod};',`window.NOVACandles={applyAnalysisRows,pollLive,set:(d)=>{base=d;current=JSON.parse(JSON.stringify(d));timeframe='analysis';serial=1;},get:()=>current};`);
+const bar={open:105,high:110,low:103,close:109,volume:300};let requested=[];let payload;
+const ctx={window:{},document:{getElementById:()=>null,hidden:false},requestAnimationFrame:()=>{},console,AbortController,URLSearchParams,setTimeout:()=>1,clearTimeout:()=>{},fetch:async u=>{requested.push(u);return {ok:true,json:async()=>u.startsWith('/api/market/session')?{status:'UNKNOWN',is_open:false,as_of:'2026-11-25T10:00:00+09:00'}:payload};}};
+vm.runInNewContext(source,ctx);const api=ctx.window.NOVACandles;
+function make(mode,dates){return {symbol:'005930.KS',mode,source:'kis',chart:{dates,open:[100,101],high:[105,106],low:[99,100],close:[103,104],volume:[100,200],ema20:[100,101],ema50:[99,100]}};}
+(async()=>{
+let d=make('스윙',['2026-11-23T00:00:00','2026-11-24T00:00:00']);api.set(d);payload={symbol:d.symbol,mode:d.mode,retrieved_at:'2026-11-25T10:00:00+09:00',rows:[{date:'2026-11-25',bar,partial:true}]};await api.pollLive(1);assert(requested.some(u=>u.startsWith('/api/chart/analysis-live')));assert.equal(api.get().chart.dates.length,3);assert.equal(d.chart.dates.length,2);assert.equal(api.get().chart.display_only[2],true);assert.equal(api.get().chart.partial[2],true);
+assert(api.applyAnalysisRows({...payload,rows:[{date:'2026-11-25T00:00:00',bar:{...bar,volume:400},partial:true}]}));assert.equal(api.get().chart.dates.length,3);assert(!api.applyAnalysisRows(payload));
+for(const mode of ['1분','5분','15분']){d=make(mode,['2026-11-25T09:00:00+09:00','2026-11-25T09:15:00+09:00']);api.set(d);payload={symbol:d.symbol,mode,retrieved_at:'2026-11-25T10:00:00+09:00',rows:[{date:'2026-11-25T09:15:00+09:00',bar,partial:true},{date:'2026-11-25T09:30:00+09:00',bar,partial:false},{date:'2026-11-25T09:45:00+09:00',bar,partial:true}]};assert(api.applyAnalysisRows(payload));assert.equal(api.get().chart.dates.length,4);assert.equal(api.get().chart.close[1],104);assert.equal(d.chart.dates.length,2);assert.equal(api.get().chart.display_only[2],true);assert.equal(api.get().chart.partial[2],false);}
+console.log('analysis chart tests passed');})().catch(e=>{console.error(e);process.exitCode=1});

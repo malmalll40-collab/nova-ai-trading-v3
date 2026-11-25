@@ -1,0 +1,17 @@
+{
+  "name": "NOVA AI Trading Mobile",
+  "short_name": "NOVA Trading",
+  "description": "단타·스윙 규칙 기반 분석, 안정형 신호 비교, 과거 검증 및 앱 사용방법",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07121b",
+  "theme_color": "#08131c",
+  "lang": "ko-KR",
+  "icons": [
+    {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

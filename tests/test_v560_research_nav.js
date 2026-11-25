@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const views=['analyze','recommendations','backtest','research','finance','watchlist','news','guide'];
+const obj=()=>({hidden:false,classList:{values:new Set(),toggle(k,on){if(on)this.values.add(k);else this.values.delete(k);}}});
+const elements=Object.fromEntries(['results',...views.map(x=>'view-'+x)].map(x=>[x,obj()]));const buttons=Object.fromEntries(views.map(x=>[x,obj()]));
+const ctx={window:{addEventListener(){},scrollTo(){},NOVA_PREVIEW_DATA:null},document:{getElementById:id=>elements[id],body:obj(),querySelector:q=>buttons[q.match(/data-view="(.*?)"/)[1]]},localStorage:{getItem:()=>null,setItem(){}},sessionStorage:{getItem:()=>null},requestAnimationFrame:f=>f(),console,URLSearchParams,setTimeout,clearTimeout,AbortController};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../static/app.js','utf8'),ctx);
+const run=s=>vm.runInContext(s,ctx);run("selectView('research')");assert(!elements.results.hidden&&!elements['view-research'].hidden&&elements['view-analyze'].hidden);assert(buttons.research.classList.values.has('active'));assert(ctx.document.body.classList.values.has('research-no-stock'));
+run("selectView('recommendations')");assert(elements.results.hidden&&!elements['view-recommendations'].hidden&&elements['view-research'].hidden);
+run("selectView('research');selectView('analyze')");assert(elements['view-research'].hidden&&elements.results.hidden);assert(!ctx.document.body.classList.values.has('research-open'));
+console.log('Research navigation: 3 scenarios PASS');
