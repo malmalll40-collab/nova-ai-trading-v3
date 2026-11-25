@@ -11,7 +11,7 @@ client = TestClient(server.app)
 
 def test_health_readonly_and_assets():
     info=client.get('/healthz').json()
-    assert info['app_version']=='5.6.6'
+    assert info['app_version']=='5.6.7'
     assert info['orders_enabled'] is False
     assert info['watchlist_visible_tab_only'] is True
     assert info['push_notifications'] is False

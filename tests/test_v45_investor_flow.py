@@ -104,4 +104,4 @@ def test_authenticated_mocked_http_data_and_no_secrets(monkeypatch):
         assert res.headers['cache-control']=='no-store'
         assert 'privateappsecret' not in res.text
     health=c.get('/healthz').json()
-    assert health['app_version']=='5.6.6' and not health['realtime_quote_websocket']
+    assert health['app_version']=='5.6.7' and not health['realtime_quote_websocket']

@@ -44,7 +44,7 @@ def test_scheduler_auth(monkeypatch):
     from fastapi.testclient import TestClient
     monkeypatch.delenv('NOVA_AUTOTRACK_TOKEN',raising=False);monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
     c=TestClient(server.app);assert c.post('/api/research/core561/collect').status_code==503
-    assert c.get('/healthz').json()['app_version']=='5.6.6' and not c.get('/healthz').json()['v561_live_adoption']
+    assert c.get('/healthz').json()['app_version']=='5.6.7' and not c.get('/healthz').json()['v561_live_adoption']
 
 def test_heldout_bucket_and_variable_research_cap():
     import pandas as pd

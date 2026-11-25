@@ -14,7 +14,7 @@ def test_guide_tab_in_rendered_shell_and_version():
     assert 'id="view-guide"' in h
     assert h.count('class="guide-step"') == 11
     assert h.index('id="view-guide"') > h.index('id="view-finance"')
-    assert client.get('/healthz').json()['app_version'] == '5.6.6'
+    assert client.get('/healthz').json()['app_version'] == '5.6.7'
 
 
 def test_guide_explains_existing_functions_without_fabricated_accuracy():

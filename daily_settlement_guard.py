@@ -18,6 +18,7 @@ SETTLEMENT_AFTER=clock_time(18,0)
 _PROVIDER_CACHE={}
 _CACHE_LOCK=threading.RLock()
 _REGULAR_CACHE={}
+_REGULAR_DIAGNOSTICS={}
 _REGULAR_LOCK=threading.RLock()
 _CACHE_TTL=300
 _FIELDS=('Open','High','Low','Close')
@@ -51,48 +52,21 @@ def _safe_summary(row):
 
 
 def regular_reference(api, code, day):
-    """Strict regular-session minute coverage. No synthetic missing minutes.
-    Closing auction must have an explicit close-time row. The provider's
-    minute timestamp convention still requires live confirmation.
-    """
+    """Strict regular-session coverage with bounded gap recovery; no synthetic rows."""
     from market_sessions import krx_session
+    from kis_minute_coverage import collect
     schedule=krx_session(datetime.combine(day,clock_time(21),tzinfo=KST))
-    if not schedule.get('calendar_verified') or not schedule.get('close_kst'):
+    key=(code,day.isoformat())
+    if not schedule.get('calendar_verified') or not schedule.get('close_kst') or not schedule.get('open_kst'):
+        with _REGULAR_LOCK:_REGULAR_DIAGNOSTICS[key]={'reason':'SESSION_UNAVAILABLE'}
         return None
     start=pd.Timestamp(f"{day} {schedule['open_kst']}",tz=KST)
     close=pd.Timestamp(f"{day} {schedule['close_kst']}",tz=KST)
-    cursor=close.strftime('%H%M%S');rows={}
-    for _ in range(6):
-        r=api.get('/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice','FHKST03010230',{
-            'FID_COND_MRKT_DIV_CODE':'J','FID_INPUT_ISCD':code,'FID_INPUT_HOUR_1':cursor,
-            'FID_INPUT_DATE_1':day.strftime('%Y%m%d'),'FID_PW_DATA_INCU_YN':'Y','FID_FAKE_TICK_INCU_YN':''})
-        times=[]
-        for x in r.get('output2') or []:
-            if x.get('stck_bsop_date')!=day.strftime('%Y%m%d'):continue
-            stamp=pd.Timestamp(datetime.strptime(x['stck_bsop_date']+x['stck_cntg_hour'],'%Y%m%d%H%M%S'),tz=KST)
-            if not start<=stamp<=close:continue
-            val={f:float(x[k]) for f,k in zip(_FIELDS,('stck_oprc','stck_hgpr','stck_lwpr','stck_prpr'))}
-            if not all(math.isfinite(v) and v>0 for v in val.values()) or val['High']<max(val.values()) or val['Low']>min(val.values()):return None
-            if stamp.second or stamp.microsecond:return None
-            # cntg_vol is minute execution volume, not cumulative acml_vol.
-            try: volume=float(x['cntg_vol'])
-            except (KeyError,TypeError,ValueError):return None
-            if not math.isfinite(volume) or volume<0 or not volume.is_integer():return None
-            val['Volume']=volume
-            if stamp in rows and rows[stamp]!=val:return None
-            rows[stamp]=val;times.append(stamp)
-        if not times or min(times)<=start:break
-        next_cursor=(min(times)-pd.Timedelta(seconds=1)).strftime('%H%M%S')
-        if next_cursor>=cursor:break
-        cursor=next_cursor
-    # Final ten minutes are closing call auction; no continuous fills required.
-    expected=pd.date_range(start,close-pd.Timedelta(minutes=11),freq='min')
-    if close not in rows or any(t not in rows for t in expected):return None
-    if rows[start]['Volume']<=0 or rows[close]['Volume']<=0:return None
-    executed=[v for v in rows.values() if v['Volume']>0]
-    return {'Open':rows[start]['Open'],'High':max(v['High'] for v in executed),
-            'Low':min(v['Low'] for v in executed),'Close':rows[close]['Close'],
-            'Volume':sum(v['Volume'] for v in rows.values())}
+    result,diagnostic=collect(api,code,day,start,close)
+    with _REGULAR_LOCK:
+        if len(_REGULAR_DIAGNOSTICS)>=256:_REGULAR_DIAGNOSTICS.clear()
+        _REGULAR_DIAGNOSTICS[key]=diagnostic
+    return result
 
 
 def cached_regular_reference(api, code, day, *, force=False):
@@ -101,6 +75,7 @@ def cached_regular_reference(api, code, day, *, force=False):
         rec=_REGULAR_CACHE.get(key)
         if not force and rec and time.monotonic()-rec[0]<_CACHE_TTL:
             return rec[1]
+        _REGULAR_DIAGNOSTICS.pop(key,None)
         result=regular_reference(api,code,day)
         if len(_REGULAR_CACHE)>=256:_REGULAR_CACHE.clear()
         _REGULAR_CACHE[key]=(time.monotonic(),result)
@@ -114,6 +89,7 @@ def discard_failed_regular_reference(code, day):
         rec=_REGULAR_CACHE.get(key)
         if rec is not None and rec[1] is None:
             _REGULAR_CACHE.pop(key,None)
+            _REGULAR_DIAGNOSTICS.pop(key,None)
             return True
     return False
 
@@ -188,7 +164,11 @@ def verify_latest_kis_daily(bars, *, api, code, symbol, now=None,
     if regular is None:
         broker,ref_errors=independent_quotes(api,code,symbol,latest,force=force)
         errors.extend(ref_errors)
-        try:regular=cached_regular_reference(api,code,latest,force=force)
+        try:
+            with _REGULAR_LOCK:
+                regular=cached_regular_reference(api,code,latest,force=force)
+                diagnostic=_REGULAR_DIAGNOSTICS.get((code,latest.isoformat()))
+                if diagnostic:base['minute_coverage']=dict(diagnostic)
         except Exception:errors.append('KIS_REGULAR_QUERY_FAILED')
         if regular is None:errors.append('KIS_REGULAR_COVERAGE_INCOMPLETE')
     base['archive_reused']=reused
