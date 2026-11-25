@@ -160,6 +160,8 @@ def accuracy_summary(data):
 def batch_summary(state):
     try:emit_accuracy(state)
     except Exception:pass # reporting must not affect research
+    try:emit_policy571(state)
+    except Exception:pass # reporting must not affect research
     rows=state.get('rows') or [];aligned=state.get('core542_aligned') or {};u=aligned.get('v561_unified') or {}
     portfolio=u.get('portfolio') or {}; groups=u.get('by_group') or {}
     def perf(p):return {k:num(p.get(k)) for k in ('return_pct','mdd_pct','trades','stress_return_pct')}
@@ -185,3 +187,23 @@ def emit_accuracy(state):
     for kind,group in groups.items():
         for regime,metrics in group.items():
             emit('v570_historical_regime',{'kind':kind,'regime':regime,'metrics':metrics,'historical_only':True,'strategy_adoption':'HOLD'})
+
+def emit_policy571(state):
+    d=(state.get('core542_aligned') or {}).get('v571_policy') or {}
+    base={'model_version':'5.7.1','status':'READY' if d.get('status')=='READY' else 'UNAVAILABLE',
+          'historical_only':True,'strategy_adoption':'HOLD'}
+    if base['status']!='READY':
+        emit('v571_historical',base);return
+    states=('FILTERED','INSUFFICIENT_POOL','NONPOSITIVE_CORE','ROUTE_FILTER','SELECTED_ROUTE','CORE_FALLBACK')
+    def fields(x,keys):return {k:num((x or {}).get(k)) for k in keys}
+    def summary(x):
+        return {**fields(x,('opportunities','core_candidates','eligible_candidates','blocked_wins','blocked_nonpositive','scored','brier','naive_brier')),
+                **{k:fields(x.get(k),V570_FIELDS) for k in ('core','v570','v571')},
+                'matched_calibration':fields(x.get('matched_calibration'),('scored','v570','v571','v570_naive','v571_naive')),
+                'states':fields(x.get('states'),states)}
+    emit('v571_historical',{**base,'start':day(d.get('start')),'end':day(d.get('end')),
+         'outcome_end':day(d.get('outcome_end')),'market_coverage':fields(d.get('market_coverage'),V570_MARKETS),
+         'overall':summary(d.get('overall') or {})})
+    for kind,keys in (('by_regime',V570_REGIMES),('by_market',V570_MARKETS)):
+        for k in keys:
+            emit('v571_historical_regime',{**base,'kind':kind,'regime':k,'metrics':summary((d.get(kind) or {}).get(k) or {})})
