@@ -94,6 +94,7 @@ def test_pattern_scan_never_runs_other_rankers(monkeypatch):
 def test_pattern_worker_does_not_persist_evidence(monkeypatch):
     monkeypatch.setattr(server,'SCAN_PROFILES',{'full':{'status':'idle'},'pattern':{'job_id':'fixture','status':'running'}})
     monkeypatch.setattr(server,'SCAN_CANCEL',__import__('threading').Event())
+    monkeypatch.setattr(server,'SCAN_PENDING',{})
     seen=[]
     def fake_scan(**kwargs):
         seen.append(kwargs['pattern_only'])
