@@ -18,6 +18,13 @@ STOCK_PATH='/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice'
 INDEX_PATH='/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice'
 
 
+PROVIDER_STOPS=frozenset((
+    'RESEARCH_TRANSPORT_TIMEOUT','RESEARCH_TRANSPORT_FAILURE',
+    'RESEARCH_HTTP_FAILURE_429','RESEARCH_HTTP_FAILURE_AUTH',
+    'RESEARCH_HTTP_FAILURE_SERVER','RESEARCH_HTTP_FAILURE_OTHER',
+    'RESEARCH_PAYLOAD_FAILURE_EGW00201','RESEARCH_PAYLOAD_FAILURE_EGW00123',
+    'RESEARCH_PAYLOAD_FAILURE_OTHER','RESEARCH_RESPONSE_DECODE_FAILURE'))
+
 class ResearchBlocked(RuntimeError):
     pass
 
@@ -95,15 +102,24 @@ class ResearchHistoryClient:
                     'appkey':k.key,'appsecret':k.secret,'tr_id':tr_id,'custtype':'P',
                     'content-type':'application/json; charset=utf-8'},params=params,timeout=TIMEOUT,
                     allow_redirects=False)
-            except Exception:raise ResearchBlocked('RESEARCH_PROVIDER_FAILURE') from None
+            except Exception as exc:
+                import requests
+                code='RESEARCH_TRANSPORT_TIMEOUT' if isinstance(exc,(TimeoutError,requests.exceptions.Timeout)) else 'RESEARCH_TRANSPORT_FAILURE'
+                raise ResearchBlocked(code) from None
         try:
-            if not 200<=int(r.status_code)<300:raise ResearchBlocked('RESEARCH_HTTP_FAILURE')
+            status=int(r.status_code)
+            if not 200<=status<300:
+                kind='429' if status==429 else 'AUTH' if status in (401,403) else 'SERVER' if 500<=status<600 else 'OTHER'
+                raise ResearchBlocked('RESEARCH_HTTP_FAILURE_'+kind)
             data=r.json()
-            if not isinstance(data,dict) or data.get('rt_cd')!='0':raise ResearchBlocked('RESEARCH_PAYLOAD_FAILURE')
+            if not isinstance(data,dict) or data.get('rt_cd')!='0':
+                code=data.get('msg_cd') if isinstance(data,dict) else None
+                kind=code if code in ('EGW00201','EGW00123') else 'OTHER'
+                raise ResearchBlocked('RESEARCH_PAYLOAD_FAILURE_'+kind)
             return data
         except ResearchBlocked:
             self._telemetry.failure()
             raise
         except Exception:
             self._telemetry.failure()
-            raise ResearchBlocked('RESEARCH_PROVIDER_FAILURE') from None
+            raise ResearchBlocked('RESEARCH_RESPONSE_DECODE_FAILURE') from None

@@ -139,7 +139,7 @@ def run(dsn,*,collection=None,allow_collection=False,calendar=session_dates,read
         report={**BASE,'coverage':{k:status.get(k) for k in ('status','dataset','stored_rows','expected_rows','complete_streams')},
             'calendar_corrections':audit['corrections_applied']}
         if isinstance(progress,dict):
-            report['collection']={k:progress[k] for k in ('status','reason','new_rows','logical_calls') if k in progress}
+            report['collection']={k:progress[k] for k in ('status','reason','new_rows','logical_calls','window_diagnostic') if k in progress}
         if status.get('status')!='COVERAGE_COMPLETE' or panel is None:
             return {**report,'status':'BLOCKED','reason':'COMPLETE_SNAPSHOT_REQUIRED'}
         try:

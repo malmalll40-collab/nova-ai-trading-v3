@@ -9,9 +9,10 @@ import time
 from nova_v574_data_audit import KST, collect, ProbeError, MAX_PAGES, MAX_INDEX_PAGES, INDEX_CODES, SAFE_ADMISSION_STOPS
 from nova_v576_expanded_coverage import GROUPS, GroupBudget, GuardedBudget, MAX_CALLS, MAX_SECONDS, GROUP_PAUSE_SECONDS, quiet_window
 from research_history_checkpoint import initialize, missing_windows, append, manifest, saved
+from nova_v579_admission import PROVIDER_STOPS
 
 SAFE_PARTIAL = frozenset(('WINDOW_REACHED','PROVIDER_EMPTY','PAGE_LIMIT','BUDGET_EXHAUSTED',
-                          'GROUP_BUDGET_EXHAUSTED','FOREGROUND_BUSY','PROVIDER_UNHEALTHY','QUIET_WINDOW_ENDED')) | SAFE_ADMISSION_STOPS
+                          'GROUP_BUDGET_EXHAUSTED','FOREGROUND_BUSY','PROVIDER_UNHEALTHY','QUIET_WINDOW_ENDED')) | SAFE_ADMISSION_STOPS | PROVIDER_STOPS
 MAX_WINDOWS = 22
 
 def resume(api, sessions, *, transaction, now, calendar, admission, pause=time.sleep,
@@ -33,12 +34,13 @@ def resume(api, sessions, *, transaction, now, calendar, admission, pause=time.s
         return (quiet_window(t,calendar(t)) and sessions[-1]<t.astimezone(KST).date()
                 and admission() is True)
     b=GuardedBudget(guard,max_calls=max_calls,max_seconds=max_seconds)
-    rows=0; windows=0; completed=0; anchors_checked=0
+    rows=0; windows=0; completed=0; anchors_checked=0; diagnostic=None
     def result(status,reason):
         return {'status':status,'reason':reason,'dataset':dataset,'new_rows':rows,
                 'logical_calls':b.calls,'windows_attempted':windows,'complete_streams':completed,
                 'research_only':True,'training_ready':False,'adjustment_basis_verified_across_runs':False,
                 'overlap_anchors_checked':anchors_checked,'overlap_scope':'ADJACENT_SESSIONS_ONLY',
+                'window_diagnostic':diagnostic,
                 'strategy_adoption':'HOLD','orders_enabled':False}
     try:
         if not guard():
@@ -77,6 +79,10 @@ def resume(api, sessions, *, transaction, now, calendar, admission, pause=time.s
                     stats,records=collect(api,symbol,requested[0],requested[-1],requested,gb,
                         max_pages=MAX_INDEX_PAGES if symbol in INDEX_CODES else MAX_PAGES,pause=pause)
                     reason=stats['reason']
+                    diagnostic={k:stats[k] for k in ('symbol','reason','pages','expected_sessions',
+                        'observed_sessions','unexpected_sessions','missing_sessions','first','last')}
+                    diagnostic['anchors_expected']=len(anchors)
+                    diagnostic['anchors_observed']=sum(d in records for d in anchors)
                     if reason not in SAFE_PARTIAL or not set(records)<=set(requested):
                         return result('PARTIAL','WINDOW_INTEGRITY_REJECTED')
                     if any(d in records and records[d]!=prior[d] for d in anchors):

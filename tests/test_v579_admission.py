@@ -107,3 +107,16 @@ def test_proof_exception_sanitized():
     with pytest.raises(ResearchBlocked,match='ACCOUNT_QUOTA_UNVERIFIED') as exc:
         c.get(STOCK_PATH,'FHKST03010100',PARAMS)
     assert 'private' not in str(exc.value) and t.calls==0
+
+def test_transport_timeout_is_distinct_sanitized_and_not_retried():
+    import requests
+    o=LocalTelemetry(wall=lambda:NOW)
+    c,t=client(o,source=proof)
+    def fail(*args,**kw):
+        t.calls+=1
+        raise requests.exceptions.ReadTimeout('private URL')
+    t.get=fail
+    with pytest.raises(ResearchBlocked,match='^RESEARCH_TRANSPORT_TIMEOUT$') as exc:
+        c.get(STOCK_PATH,'FHKST03010100',PARAMS)
+    assert t.calls==1 and 'private' not in str(exc.value)
+    assert o.snapshot()['recent_provider_errors']==1

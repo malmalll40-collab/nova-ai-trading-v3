@@ -25,6 +25,9 @@ class SharedRequestGate:
         return (self._policy and isinstance(permit,LocalPolicyPermit) and permit.gate is self
                 and 0<=self._clock()-permit.issued<=5.0)
 
+    def status(self):
+        return self._ledger.status(self._limit)
+
     def _finish(self,lease):
         try:
             if self._ledger.finish(lease) is not True:
