@@ -1,4 +1,5 @@
 """NOVA v3.6 read-only foreground batch scanner, no broker orders or scheduled jobs."""
+from nova_release import APP_VERSION
 from pathlib import Path
 from types import SimpleNamespace
 from fastapi.testclient import TestClient
@@ -11,7 +12,7 @@ client = TestClient(server.app)
 
 def test_health_readonly_and_assets():
     info=client.get('/healthz').json()
-    assert info['app_version']=='5.7.0'
+    assert info['app_version']==APP_VERSION
     assert info['orders_enabled'] is False
     assert info['watchlist_visible_tab_only'] is True
     assert info['push_notifications'] is False

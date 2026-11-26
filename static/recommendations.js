@@ -31,6 +31,14 @@
       count.hidden=true;fill.style.width=finished?'100%':'0%';
       bar.removeAttribute('aria-valuenow');bar.setAttribute('aria-valuetext',running?'시장 자료 확인 중':finished?'검색 완료':'검색 진행 전');
     }
+    const patternButton=$('patternScan'),patternStatus=$('patternStatus'),patternResults=$('patternResults');
+    if(patternButton){
+      patternButton.disabled=running||kind==='unavailable';
+      patternButton.setAttribute('aria-busy',String(running));
+      patternButton.textContent=running?(hasRealProgress?`신호패턴 분석 중 · ${Math.min(done,total)}/${total}`:'신호패턴 검색 중…'):'신호패턴 종목 검색';
+    }
+    if(patternStatus)patternStatus.textContent=(names[kind]||names.idle)+' · '+detail.textContent;
+    if(kind!=='complete'&&patternResults){patternResults.replaceChildren();shownResult='';}
     button.disabled=running||kind==='unavailable';
     button.setAttribute('aria-busy',String(running));
     button.textContent=running?(hasRealProgress?`↻ 심층 분석 중 · ${Math.min(done,total)}/${total}`:'↻ 시장자료 검색 중…'):'⌕ 전체 시장 검색 시작';
@@ -71,7 +79,11 @@
     if(res.selection_lanes){const p=document.createElement('p');p.className='note';p.textContent=`후보 구성: 유동성 ${res.selection_lanes['유동성']||0}개 · 거래활동 ${res.selection_lanes['거래활동']||0}개 · 수급 자료 확보 관심후보 ${res.flow_auxiliary_coverage||0}개. 수급은 매수 승인에 사용하지 않습니다.`;list.append(p);}
     if(res.scan_freshness_method){const p=document.createElement('p');p.className='note';p.textContent=`시세 신선도: ${res.scan_freshness_method} · 현재가가 아닌 기준일 스윙 연구`;list.append(p);}
     // Independent research display; failure must not hide legacy candidates.
-    try{window.NOVAPatternResearch?.render(list,res);}catch{const p=document.createElement('p');p.className='note';p.textContent='신호패턴 연구 화면 표시 실패 · 기존 후보는 유지됩니다.';list.append(p);}
+    const patternList=$('patternResults');
+    try{
+      if(patternList){patternList.replaceChildren();window.NOVAPatternResearch?.render(patternList,res);}
+      else window.NOVAPatternResearch?.render(list,res);
+    }catch{const p=document.createElement('p');p.className='note';p.textContent='신호패턴 연구 화면 표시 실패 · 기존 후보는 유지됩니다.';(patternList||list).append(p);}
     const items=Array.isArray(res.recommendations)?res.recommendations:[];
     const strictHeading=document.createElement('h3');strictHeading.textContent=`엄격 매수 후보 · ${items.length}개`;list.append(strictHeading);
     if(items.length){const ranking=document.createElement('p');ranking.className='recommend-rank-intro';ranking.textContent='엄격 매수 순위: 최근 별도 검증의 Wilson 신뢰하한 → 평균 순수익 → 검증 표본 → 손익비 순. 같은 검색 결과 안에서의 상대 순위이며 실제 상승 확률이나 매수 우선 명령이 아닙니다.';list.append(ranking);}
@@ -172,7 +184,7 @@
     finally{busy=false;}
   }
   async function scan(){
-    if(preview)return;
+    if(preview||$('recommendScan')?.disabled)return;
     stopPoll();shownResult='';
     $('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();
     setSearchState('running',{message:'검색 시작 요청 중… 시장별 일별 데이터를 확인합니다.',progress:{phase:'provider'}});
@@ -223,8 +235,15 @@
   function init(){
     if(!$('recommendScan'))return;
     $('recommendScan').onclick=scan;
+    const toggle=$('patternMenuToggle'),body=$('patternMenuBody'),patternButton=$('patternScan');
+    if(toggle&&body)toggle.onclick=()=>{
+      body.hidden=!body.hidden;
+      toggle.setAttribute('aria-expanded',String(!body.hidden));
+      toggle.textContent=body.hidden?'신호패턴 전용 메뉴 열기':'신호패턴 전용 메뉴 닫기';
+    };
+    if(patternButton)patternButton.onclick=scan;
     const diag=$('recommendDiagnose');if(diag)diag.onclick=diagnose;
-    const refreshOptions=()=>{shownResult='';const n=$('recommendNumbers');if(n)n.hidden=true;$('recommendResults').replaceChildren();fetchState();};
+    const refreshOptions=()=>{shownResult='';const n=$('recommendNumbers');if(n)n.hidden=true;$('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();if($('patternStatus'))$('patternStatus').textContent='선택 조건 변경 · 검색 상태 확인 중';fetchState();};
     const source=$('recommendSource');if(source)source.onchange=refreshOptions;
     if($('recommendDepth'))$('recommendDepth').onchange=refreshOptions;
     $('recommendMarket').onchange=refreshOptions;

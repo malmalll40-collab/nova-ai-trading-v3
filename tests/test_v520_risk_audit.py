@@ -1,4 +1,5 @@
 """v5.2: fixed pre-specified risk research never promoted to a live signal."""
+from nova_release import APP_VERSION
 import math
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -85,7 +86,7 @@ def test_risk_audit_does_not_invent_profit_without_trades():
 def test_health_status_and_api_research_only(monkeypatch):
     import server
     h=server.healthz()
-    assert h['app_version']=='5.7.0'
+    assert h['app_version']==APP_VERSION
     assert h['v52_risk_audit'] and not h['v52_filters_live_adopted']
     monkeypatch.setenv('NOVA_ACCESS_TOKEN','v52-test-secret')
     client=TestClient(server.app)

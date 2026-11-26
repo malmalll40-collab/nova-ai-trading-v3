@@ -11,7 +11,9 @@ from numbers import Real
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = '5.7.0'
+from nova_release import APP_VERSION
+
+VERSION = APP_VERSION
 LOG = logging.getLogger('uvicorn.error')
 STATES = {'DATA_MISSING','RISK_OR_DATA_VETO','NO_BUY_CANDIDATE','INSUFFICIENT_POOL','NONPOSITIVE_EV','RESEARCH_ESTIMATE'}
 CAL_CODES = {'XKRX_IMPORT_UNAVAILABLE','XKRX_LOAD_FAILED','XKRX_DATE_OUT_OF_RANGE','XKRX_SESSION_CHECK_FAILED','XKRX_PREVIOUS_SESSION_FAILED'}

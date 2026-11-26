@@ -1,4 +1,5 @@
 """Release merge guard: v4.5.2 KIS/session logic and v4.6 evidence coexist."""
+from nova_release import APP_VERSION
 from pathlib import Path
 from fastapi.testclient import TestClient
 
@@ -7,7 +8,7 @@ import server
 
 def test_release_features_are_present_without_orders():
     d=TestClient(server.app).get('/healthz').json()
-    assert d['app_version']=='5.7.0'
+    assert d['app_version']==APP_VERSION
     assert d['auto_swing_kis_first'] is True
     assert d['completed_session_freshness'] is True
     assert d['evidence_lab_version']=='4.7.0-auto-research'

@@ -1,4 +1,5 @@
 """Auto market recommendation evidence: immutable, prospective, token isolated, no fake fills."""
+from nova_release import APP_VERSION
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -122,7 +123,7 @@ def test_scanner_scan_does_not_change_decisions(monkeypatch):
     # New calls use separate read-only reporting/storage modules; never place orders.
     status=TestClient(app).get('/healthz').json()
     assert status['orders_enabled'] is False
-    assert status['app_version']=='5.7.0'
+    assert status['app_version']==APP_VERSION
 
 
 def test_observed_user_signal_prospective_close_recording(tmp_path,monkeypatch):

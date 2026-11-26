@@ -1,4 +1,5 @@
 """Offline regression tests for KIS-only migration and strict regular-session guard."""
+from nova_release import APP_VERSION
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -68,7 +69,7 @@ def test_public_routes_reject_legacy_yahoo(monkeypatch):
     for path in ['/api/analysis','/api/chart/history','/api/research/v5']:
         r=c.get(path+'?symbol=005930.KS&source=yahoo',headers=h)
         assert r.status_code==422,(path,r.status_code)
-    assert server.healthz()['kis_only_analysis'] and server.healthz()['app_version']=='5.7.0'
+    assert server.healthz()['kis_only_analysis'] and server.healthz()['app_version']==APP_VERSION
 
 def test_auto_source_never_falls_back(monkeypatch):
     import server

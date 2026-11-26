@@ -1,4 +1,5 @@
 """NOVA 5.3: fixed-rule grouped votes, index coverage and no-live-adoption guards."""
+from nova_release import APP_VERSION
 import pandas as pd
 from engine import Config, decide
 from nova_v53_audit import (benchmark_coverage, grouped_signal, grouped_vote_study,
@@ -113,7 +114,7 @@ def test_batch_shows_separate_stock_counts_not_aggregated_portfolio_returns():
 def test_research_uses_extended_benchmark_and_never_changes_live_endpoints(monkeypatch):
     import server
     from pathlib import Path
-    assert server.healthz()['app_version']=='5.7.0'
+    assert server.healthz()['app_version']==APP_VERSION
     assert not server.healthz()['v53_live_adoption']
     assert 'id="v53DecisionGate"' in (server.ASSETS/'index.html').read_text()
     assert 'renderV53' in (server.ASSETS/'v5_dashboard.js').read_text()

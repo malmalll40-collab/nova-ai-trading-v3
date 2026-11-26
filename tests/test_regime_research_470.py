@@ -1,4 +1,5 @@
 """v4.7 research-only, no lookahead, immutable observational proof."""
+from nova_release import APP_VERSION
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -134,7 +135,7 @@ def test_auth_protected_endpoint_and_no_orders(tmp_path,monkeypatch):
     assert response.status_code==200
     assert response.json()['status']=='insufficient_context'
     h=c.get('/healthz').json()
-    assert h['app_version']=='5.7.0'
+    assert h['app_version']==APP_VERSION
     assert h['orders_enabled'] is False
     assert h['market_regime_live_adoption'] is False
 
@@ -172,10 +173,10 @@ def test_v47_ui_visible_and_backwards_compatible():
     from pathlib import Path
     import server
     root=Path(server.ASSETS)
-    html=(root/'index.html').read_text(encoding='utf-8')
+    html=server.index().body.decode('utf-8')
     js=(root/'journal.js').read_text(encoding='utf-8')
     sw=(root/'sw.js').read_text(encoding='utf-8')
-    assert 'NOVA | AI Trading Mobile v5.7.0' in html
+    assert ('NOVA | AI Trading Mobile v'+APP_VERSION) in html
     assert 'id="autoEvidenceButton"' in html
     assert 'id="regimeResearchButton"' in html
     assert 'id="intradayContext"' in html

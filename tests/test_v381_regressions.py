@@ -1,5 +1,6 @@
 """NOVA v3.9 defect regressions: final signal, no-lookahead, fees, UI safety."""
 from __future__ import annotations
+from nova_release import APP_VERSION
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from pathlib import Path
@@ -159,7 +160,7 @@ def test_frontend_alert_finance_independent_and_journal_safety():
 def test_health_pwa_version_and_no_orders():
     client=TestClient(server.app)
     d=client.get('/healthz').json()
-    assert d['app_version']=='5.7.0' and d['orders_enabled'] is False
+    assert d['app_version']==APP_VERSION and d['orders_enabled'] is False
     assert d['intraday_journal_verified'] is False
     assert 'nova3-shell-v45' in client.get('/sw.js').text
     assert 'id="view-guide"' in client.get('/').text
