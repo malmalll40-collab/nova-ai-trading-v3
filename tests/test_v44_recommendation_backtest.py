@@ -1,4 +1,5 @@
 """Mocked v4.4 historical screen: no public portal key or fabricated live results."""
+from nova_release import APP_VERSION
 import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -140,4 +141,4 @@ def test_ui_has_backend_connection_and_pwa_cache():
     assert '/api/recommendations/backtest/status' in js
     assert 'nova3-shell-v45' in sw
     assert '/static/recommendation_history.js' in sw
-    assert server.healthz()['app_version']=='5.7.0'
+    assert server.healthz()['app_version']==APP_VERSION
