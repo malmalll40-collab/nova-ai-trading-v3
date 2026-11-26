@@ -17,6 +17,7 @@
     box.append(node('h3','','AI 신호패턴 추천 · 연구 전용'));
     box.append(node('p','note','13개 역할 기반 매수 신호의 반복 패턴을 분석합니다. 점수는 검증된 상승 확률이나 실제 매수 신호가 아닙니다.'));
     parent.append(box);
+    if(res?.scan_cache_counts)box.append(node('p','note','검증 완료봉 재사용 '+count(res.scan_cache_counts.HIT)+'개 · 새 조회 '+count(res.scan_cache_counts.MISS)+'개 · 최대 5분 · 패턴 판단 재계산'));
     const p=res?.signal_pattern_research;
     if(!p||p.version!=='5.8.4'||p.research_only!==true||p.asof!==res.data_date||p.status!=='RESEARCH_ONLY'){
       box.append(node('p','recommend-empty','신호패턴 연구 결과 미확인. 새 검색 또는 자료 검증이 필요합니다.'));return;
