@@ -19,7 +19,8 @@ def resume(api, sessions, *, transaction, now, calendar, admission, pause=time.s
     """One bounded pass; missing windows plus adjacent saved-session anchors.
 
     transaction() yields (cursor, backend), commits on normal exit and rolls
-    back on exceptions. No connection is held across a provider request.
+    back on exceptions. No transaction is held across a provider request;
+    a caller may keep a dedicated session lock open.
     """
     if (type(max_calls) is not int or not 1<=max_calls<=MAX_CALLS
             or type(max_seconds) is not int or not 1<=max_seconds<=MAX_SECONDS
