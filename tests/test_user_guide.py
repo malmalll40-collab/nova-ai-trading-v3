@@ -10,7 +10,7 @@ def test_guide_tab_in_rendered_shell_and_version():
     assert response.status_code == 200
     h = response.text
     assert 'data-view="guide"' in h
-    assert h.count('class="nav-item') == 9
+    assert h.count('class="nav-item') == 10
     assert 'id="v5MoreNav"' in h
     assert 'id="view-guide"' in h
     assert h.count('class="guide-step"') == 11
@@ -34,9 +34,9 @@ def test_guide_works_without_analysis_and_sw_increments():
     js=(server.ASSETS/'app.js').read_text(encoding='utf-8')
     css=(server.ASSETS/'styles.css').read_text(encoding='utf-8')
     assert "next==='guide'||next==='news'||next==='recommendations'||!latest" in js
-    assert "['analyze','recommendations','backtest','research','finance','watchlist','news','guide']" in js
+    assert "['home','analyze','recommendations','backtest','research','finance','watchlist','news','guide']" in js
     assert '.guide-open #results' in css
-    assert 'repeat(7,minmax(0,1fr))' in css
+    assert '.v6-five-nav' in css and 'repeat(5,minmax(0,1fr))' in css
     assert 'nova3-shell-v45' in (server.ASSETS/'sw.js').read_text(encoding='utf-8')
 
 
