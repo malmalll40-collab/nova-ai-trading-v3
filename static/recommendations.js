@@ -47,6 +47,15 @@
   function render(res){
     const nums=$('recommendNumbers'), list=$('recommendResults');if(!nums||!list)return;
     nums.replaceChildren();list.replaceChildren();nums.hidden=false;
+    const onlyPattern=res.scan_profile==='pattern';
+    if(onlyPattern){
+      nums.hidden=true;
+      const target=$('patternResults')||list;
+      target.replaceChildren();
+      try{if(typeof window.NOVAPatternResearch?.render!=='function')throw Error('renderer unavailable');window.NOVAPatternResearch.render(target,res);}catch{const err=document.createElement('p');err.textContent='신호패턴 연구 화면 표시 실패';target.append(err);}
+      const note=document.createElement('p');note.className='note';note.textContent='신호패턴 전용 검색 결과 · 엄격 매수 및 관심 후보는 평가하지 않았습니다. 전체 시장 검색을 별도로 실행하세요.';list.append(note);
+      return;
+    }
     nums.append(cell(res.marketwide?'시장 전체 조회':'상장목록/시장 범위',res.total_market_rows!=null?`${res.total_market_rows}종목`:'제한 목록'),
       cell('1차 통과',`${res.screen_passed??0}종목`),
       cell('NOVA 심층 분석',`${res.deep_succeeded??0}/${res.deep_target??0}종목`),
@@ -173,7 +182,7 @@
         setSearchState('failed',{message});status(`검색 실패: ${message}`,true);return;
       }
       if(d.status==='complete'&&d.result){
-        setSearchState('complete',{message:`${d.result.data_date||'기준일 미확인'} · 엄격 매수 ${d.result.recommended_count||0}개 · 관심 ${d.result.interest_count||0}개`});
+        setSearchState('complete',{message:completionMessage(d.result)});
         status(`검색 완료 · ${d.result.data_date} 기준 · ${d.result.data_source||'일별'} · 실시간 아님`);
         if(shownResult!==d.job_id){render(d.result);shownResult=d.job_id;}
         return;
@@ -183,14 +192,18 @@
     }catch(e){$('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();shownResult='';setSearchState('unavailable',{message:'서버 연결 또는 인증 상태를 확인할 수 없습니다. 페이지를 새로고침해 주세요.'});status(e.message||'검색 상태 확인 실패',true);stopPoll();}
     finally{busy=false;}
   }
-  async function scan(){
+  function completionMessage(res){
+    const elapsed=Number.isFinite(res.elapsed_seconds)?' · 소요 '+res.elapsed_seconds+'초':'';
+    return (res.data_date||'기준일 미확인')+' · '+(res.scan_profile==='pattern'?'신호패턴 전용 · 연구 후보 '+(res.signal_pattern_research?.eligible_total??'미확인')+'개':'전체 검색 · 엄격 매수 '+(res.recommended_count??'미확인')+'개 · 관심 '+(res.interest_count??'미확인')+'개')+elapsed;
+  }
+  async function scan(profile='full'){
     if(preview||$('recommendScan')?.disabled)return;
     stopPoll();shownResult='';
     $('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();
     setSearchState('running',{message:'검색 시작 요청 중… 시장별 일별 데이터를 확인합니다.',progress:{phase:'provider'}});
     status('검색 요청을 전송했습니다. 결과가 준비될 때까지 화면에 진행 상태가 표시됩니다.');
     try{
-      const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({market:$('recommendMarket').value,source:$('recommendSource')?.value||'auto',depth:Number($('recommendDepth')?.value||48)}),cache:'no-store'});
+      const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({market:$('recommendMarket').value,source:$('recommendSource')?.value||'auto',depth:Number($('recommendDepth')?.value||48),profile}),cache:'no-store'});
       const d=await r.json().catch(()=>({}));
       if(!r.ok){const detail=d.detail;throw new Error(typeof detail==='string'?detail:(detail?.message||`검색 요청 실패 HTTP ${r.status}`));}
       if(d.status==='complete'&&d.result){
@@ -234,12 +247,12 @@
   }
   function init(){
     if(!$('recommendScan'))return;
-    $('recommendScan').onclick=scan;
+    $('recommendScan').onclick=()=>scan('full');
     const patternButton=$('patternScan');
     if(patternButton){
-      patternButton.onclick=scan;
+      patternButton.onclick=()=>scan('pattern');
       patternButton.disabled=$('recommendScan').disabled;
-      if($('patternStatus'))$('patternStatus').textContent='검색 대기 · 기존 전체 시장 검색과 결과를 공유합니다.';
+      if($('patternStatus'))$('patternStatus').textContent='검색 대기 · 신호패턴 전용 경량 분석';
     }
     const diag=$('recommendDiagnose');if(diag)diag.onclick=diagnose;
     const refreshOptions=()=>{shownResult='';const n=$('recommendNumbers');if(n)n.hidden=true;$('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();if($('patternStatus'))$('patternStatus').textContent='선택 조건 변경 · 검색 상태 확인 중';fetchState();};
