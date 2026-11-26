@@ -3,7 +3,7 @@
 (()=>{
   const $ = id=>document.getElementById(id);
   const preview=Boolean(window.NOVA_PREVIEW_DATA);
-  let timer=null, busy=false, lastJob='', shownResult='';
+  let timer=null, busy=false, submitting=false;
   const viewOpen=()=>window.NOVAConnect?.currentView()==='recommendations'&&!document.hidden;
   const won=v=>v==null||!Number.isFinite(Number(v))?'미확인':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0}).format(Number(v))+'원';
   const money=v=>v==null?'—':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:1}).format(Number(v)/1e8)+'억원';
@@ -137,12 +137,21 @@
     jobs[p]=d;
     const pre=prefix(p), active=activeStates.includes(d.status), other=d.active_profile&&d.active_profile!==p;
     const o=options(p),ready=o.source==='fsc'?d.fsc_configured:o.source==='krx'?d.krx_configured:d.fsc_configured||d.krx_configured;
-    const msg=({cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 이전 결과 유지',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료',idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
+    const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
+    const msg=({cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
     if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg,progress:d.progress});status(msg);}
     else if($('patternStatus'))$('patternStatus').textContent=msg;
     const button=$(pre+'Scan');if(button)button.disabled=Boolean(active||other||!ready);
     const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=d.status!=='running'||!d.job_id;
-    if(d.status==='complete'&&d.result)render(d.result);
+    const target=p==='full'?'recommendResults':'patternResults';
+    const matches=d.market===o.market&&d.depth===o.depth&&(o.source==='auto'?(d.fsc_configured?'fsc':'krx')===d.source:o.source===d.source);
+    if(d.status==='complete'&&d.result&&matches){
+      render({...d.result,scan_profile:p});
+    }else if(!active){
+      $(target)?.replaceChildren();
+      if(p==='full'&&$('recommendNumbers'))$('recommendNumbers').hidden=true;
+      if(d.status==='complete'&&!matches)$(pre+'Status').textContent='이전 검색 조건과 다릅니다. 새 검색을 실행하세요.';
+    }
   }
   async function fetchState(){
     if(preview||busy)return;busy=true;
@@ -156,13 +165,15 @@
     }catch(e){status(e.message,true);}finally{busy=false;}
   }
   async function scan(p='full'){
-    if(preview||$(prefix(p)+'Scan')?.disabled)return;
-    $(prefix(p)+'Scan').disabled=true;
+    if(preview||submitting||$(prefix(p)+'Scan')?.disabled)return;
+    submitting=true;
+    for(const q of ['full','pattern'])$(prefix(q)+'Scan').disabled=true;
     try{
       const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify(options(p)),cache:'no-store'});
       const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:d.detail?.message||'검색 실패');
       applyState(p,d);startPoll();await fetchState();
     }catch(e){$(prefix(p)+'Status').textContent=e.message;await fetchState();}
+    finally{submitting=false;}
   }
   async function cancel(p){
     const d=jobs[p];if(!d.job_id||d.status!=='running')return;
@@ -214,7 +225,7 @@
     for(const p of ['full','pattern']){
       const pre=prefix(p);
       const btn=$(pre+'Cancel');if(btn)btn.onclick=()=>cancel(p);
-      for(const key of ['Source','Depth','Market'])if($(pre+key))$(pre+key).onchange=fetchState;
+      for(const key of ['Source','Depth','Market'])if($(pre+key))$(pre+key).onchange=()=>{if(p==='full'){$('recommendResults')?.replaceChildren();if($('recommendNumbers'))$('recommendNumbers').hidden=true;}else $('patternResults')?.replaceChildren();fetchState();};
     }
     document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPoll();else if(viewOpen())fetchState();});
   }
