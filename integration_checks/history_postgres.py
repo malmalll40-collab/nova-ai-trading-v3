@@ -143,6 +143,23 @@ def main():
     with tx() as (cur,kind):
         cur.execute(f'UPDATE {TABLE} SET digest=%s WHERE dataset=%s AND symbol=%s',('bad',dataset,symbol))
     assert read_status(dsn,days)['status']=='UNAVAILABLE'
+    from research_history_pipeline import read_panel
+    from nova_v574_data_audit import INDEX_CODES
+    # The integrated reader must not return corrupted or partial panels.
+    broken,raw=read_panel(dsn,days)
+    assert broken['status']=='UNAVAILABLE' and raw is None
+    partial,raw=read_panel(dsn,other_days)
+    assert partial['status']=='PARTIAL' and raw is None
+    full_days=tuple(d-timedelta(days=14) for d in days)
+    with tx() as (cur,kind):
+        full_id=initialize(cur,kind,full_days)
+        for s in SYMBOLS:
+            value={'close':100} if s in INDEX_CODES else {'open':99,'high':102,'low':98,'close':100,'volume':1000,'turnover':None}
+            assert append(cur,kind,full_id,s,{d:value for d in full_days})==len(full_days)
+    complete,raw=read_panel(dsn,full_days)
+    assert complete['status']=='COVERAGE_COMPLETE' and complete['stored_rows']==len(full_days)*len(SYMBOLS)
+    assert set(raw)==set(SYMBOLS) and all(set(v)==set(full_days) for v in raw.values())
+    print('Integrated snapshot PASS: full cohort, partial refusal and checksum failure')
     print('PostgreSQL integration PASS: durable resume, idempotence, rollback, isolated rows')
 if __name__=='__main__':
     main()
