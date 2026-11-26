@@ -163,7 +163,16 @@
       }));
       states.forEach(([p,d])=>applyState(p,d));
       if(states.some(([,d])=>activeStates.includes(d.status)))startPoll();else stopPoll();
-    }catch(e){status(e.message,true);}finally{busy=false;}
+    }catch(e){
+      $('recommendNumbers').hidden=true;
+      $('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();
+      jobs.full={};jobs.pattern={};
+      setSearchState('unavailable',{message:'검색 상태 확인 실패 · 연결을 확인하세요.'});
+      status(e.message,true);
+      for(const p of ['full','pattern']){const pre=prefix(p);$(pre+'Scan').disabled=true;$(pre+'Cancel').disabled=true;}
+      if($('patternStatus'))$('patternStatus').textContent='검색 상태 확인 실패 · 연결을 확인하세요.';
+      startPoll();
+    }finally{busy=false;}
   }
   async function scan(p='full'){
     if(preview||submitting||$(prefix(p)+'Scan')?.disabled)return;
