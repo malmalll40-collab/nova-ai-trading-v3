@@ -104,7 +104,9 @@ def test_api_depth_validation_and_ui_guard(monkeypatch):
     h=(server.ASSETS/'index.html').read_text()
     j=(server.ASSETS/'recommendations.js').read_text()
     assert 'id="recommendDepth"' in h and 'value="48" selected' in h
-    assert "depth:Number($('recommendDepth')" in j
+    assert 'id="patternDepth"' in h
+    assert "depth:Number($(prefix(p)+'Depth')" in j
+    assert "JSON.stringify(options(p))" in j
     assert 'used_for_buy' in m.summarize_auxiliary_flow(None,'20261109')
 
 

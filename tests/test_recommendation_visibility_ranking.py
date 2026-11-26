@@ -118,8 +118,8 @@ def test_ui_search_states_are_screenreader_announced_and_rank_visible():
     css=(server.ASSETS/'styles.css').read_text()
     assert 'id="recommendScanState"' in html and 'aria-live="polite"' in html
     assert 'id="recommendProgressTrack"' in html and 'aria-valuemin="0"' in html
-    assert "setSearchState('running'" in js and "setSearchState('failed'" in js
-    assert "setSearchState('complete'" in js and 'progress?.done' in js
+    assert "setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle'" in js
+    assert 'progress?.done' in js and 'aria-valuenow' in js
     assert 'recommend-rank-number' in js and 'r.rank||i+1' in js
     assert 'recommend-scan-state[data-state="running"]' in css
     assert '@media(prefers-reduced-motion:reduce)' in css

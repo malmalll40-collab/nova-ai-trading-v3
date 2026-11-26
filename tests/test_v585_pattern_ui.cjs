@@ -62,7 +62,8 @@ test('shell includes renderer before legacy recommendations and network-first ca
   assert.ok(html.indexOf('/static/pattern_research.js')<html.indexOf('/static/recommendations.js'));
   assert.ok(sw.includes('/static/pattern_research.js'));
   assert.ok(sw.includes('v585-pattern-ui'));
-  assert.ok(js.includes('window.NOVAPatternResearch?.render(list,res)'));
+  assert.ok(js.includes('window.NOVAPatternResearch.render(target,res)'));
+  assert.ok(js.includes("res.scan_profile==='pattern'"));
   assert.ok(js.includes('const items=Array.isArray(res.recommendations)'));
   assert.ok(js.includes('const interests=Array.isArray(res.interest_candidates)'));
 });

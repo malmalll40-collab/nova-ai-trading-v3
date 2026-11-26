@@ -25,7 +25,7 @@ jobs:
       - name: Compile sources
         run: python -m compileall -q -x '/\.git/' .
       - name: Focused research tests
-        run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py tests/test_v579_admission.py tests/test_v580_integrated.py tests/test_v582_signal_pattern.py tests/test_v583_pattern_replay.py tests/test_v584_pattern_scan.py tests/test_v586_release.py tests/test_v588_scan_efficiency.py
+        run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py tests/test_v579_admission.py tests/test_v580_integrated.py tests/test_v582_signal_pattern.py tests/test_v583_pattern_replay.py tests/test_v584_pattern_scan.py tests/test_v586_release.py tests/test_v588_scan_efficiency.py tests/test_v589_independent_scans.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -46,9 +46,9 @@ jobs:
           import xml.etree.ElementTree as ET
           root = ET.parse('/tmp/nova-regression.xml').getroot()
           cases = list(root.iter('testcase'))
-          assert len(cases) == 874, f'Expected 874 cases, got {len(cases)}'
+          assert len(cases) == 879, f'Expected 879 cases, got {len(cases)}'
           assert not any(c.find(k) is not None for c in cases for k in ('failure','error','skipped'))
-          print('All 874 regression cases passed without skips')
+          print('All 879 regression cases passed without skips')
           PY
       - name: Verify Render archive overlay
         if: always()

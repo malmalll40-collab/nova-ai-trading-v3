@@ -17,11 +17,14 @@ def test_service_worker_refreshes_mutable_assets_and_preserves_api_safety():
 
 def test_network_error_clears_previous_stock_cards():
     js=(server.ASSETS/'recommendations.js').read_text()
-    state=js.split('async function fetchState(){',1)[1].split('async function scan(){',1)[0]
+    state=js.split('async function fetchState(){',1)[1].split('async function scan(',1)[0]
     failure=state.split("}catch(e){",1)[1]
     assert "$('recommendNumbers').hidden=true" in failure
     assert "$('recommendResults').replaceChildren()" in failure
-    assert "shownResult=''" in failure
+    assert "$('patternResults')?.replaceChildren()" in failure
+    assert 'jobs.full={};jobs.pattern={};' in failure
+    assert "$(pre+'Scan').disabled=true" in failure
+    assert "$(pre+'Cancel').disabled=true" in failure
     assert "setSearchState('unavailable'" in failure
 
 

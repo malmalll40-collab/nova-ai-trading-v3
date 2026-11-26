@@ -338,11 +338,19 @@
         <section class="panel">
           <div class="section-title-row"><div><span class="eyebrow">MULTI-SOURCE MARKET SCANNER · V4.5</span><h2 id="recommendTitle">종목추천</h2></div><span class="tiny-tag">장 마감 자료 · 스윙</span></div>
           <section id="patternMenu" class="recommend-card" aria-labelledby="patternMenuTitle">
-            <div class="section-title-row"><div><span class="eyebrow">SIGNAL PATTERN · RESEARCH</span><h3 id="patternMenuTitle">AI 신호패턴 추천</h3></div><span class="tiny-tag">연구 전용</span></div>
+            <div class="section-title-row"><div><span class="eyebrow">SIGNAL PATTERN</span><h3 id="patternMenuTitle">AI 신호패턴 추천</h3></div></div>
             <p class="subline">반복 매수 신호로 상승 초기·가속·지속형을 탐색합니다. 전체 시장 검색과 같은 기준일·후보 선별 기준으로 패턴만 분석합니다.</p>
             <div id="patternMenuBody">
-              <p class="note">아래 시장·공급원·심층 분석 범위를 함께 사용합니다. 엄격 매수·관심 후보 및 부가 백테스트는 실행하지 않습니다.</p>
+              <p class="note">시장·공급원·심층 분석 범위를 별도로 선택합니다. 엄격 매수·관심 후보 및 부가 백테스트는 실행하지 않습니다.</p>
+          <label class="field-label" for="patternSource">신호패턴 데이터 공급원</label>
+          <select id="patternSource" class="field-input"><option value="auto">자동 선택 (금융위원회 우선)</option><option value="fsc">금융위원회 일별 시세 (T+1)</option><option value="krx">KRX 일별매매정보 (기존)</option></select>
+          <label class="field-label" for="patternMarket">시장 선택</label>
+          <select id="patternMarket" class="field-input"><option value="all">전체 (코스피 + 코스닥)</option><option value="kospi">코스피</option><option value="kosdaq">코스닥</option></select>
+          <label class="field-label" for="patternDepth">심층 분석 범위</label>
+          <select id="patternDepth" class="field-input"><option value="24">빠른 검색 · 24종목</option><option value="48" selected>균형 검색 · 48종목 (기본)</option><option value="60">확대 검색 · 60종목 (시간 소요)</option></select>
+
               <button type="button" id="patternScan" class="primary-button recommend-run" disabled>신호패턴 종목 검색</button>
+              <button type="button" id="patternCancel" class="recommend-diag-button" disabled>검색 취소</button>
               <p id="patternStatus" class="recommend-status" role="status" aria-live="polite">검색 기능 연결 대기 · 계속 이 상태라면 페이지를 새로고침하세요.</p>
               <div id="patternResults" class="recommend-results" aria-live="polite"></div>
             </div>
@@ -374,6 +382,7 @@
           <select id="recommendDepth" class="field-input"><option value="24">빠른 검색 · 24종목</option><option value="48" selected>균형 검색 · 48종목 (기본)</option><option value="60">확대 검색 · 60종목 (시간 소요)</option></select>
           <p class="note">거래대금 상위와 하루 거래활동이 높은 종목을 분산 선별합니다. 실제 상승 추세·20일 거래량은 개별 종목의 완료 일봉으로 검증하며, 매수 기준은 완화하지 않습니다.</p>
           <button type="button" id="recommendScan" class="primary-button recommend-run">⌕ 전체 시장 검색 시작</button>
+          <button type="button" id="recommendCancel" class="recommend-diag-button" disabled>검색 취소</button>
           <div id="recommendScanState" class="recommend-scan-state" data-state="idle" role="status" aria-live="polite" aria-atomic="true">
             <div class="recommend-scan-head">
               <span id="recommendScanIcon" class="recommend-scan-icon" aria-hidden="true">○</span>
