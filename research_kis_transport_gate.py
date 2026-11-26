@@ -28,6 +28,9 @@ class SharedRequestGate:
     def status(self):
         return self._ledger.status(self._limit)
 
+    def recover_undispatched_research(self):
+        return self._ledger.recover_undispatched_research(self._limit)
+
     def _finish(self,lease):
         try:
             if self._ledger.finish(lease) is not True:
@@ -52,15 +55,23 @@ class SharedRequestGate:
             if not self._policy or kind!='foreground' or self._clock()>=deadline:
                 raise ResearchBlocked('SHARED_QUOTA_BUSY')
             self._pause(min(.25,max(0.,deadline-self._clock())))
-        started=False
+        started=False;mark_attempted=False
         def start():
-            nonlocal started
+            nonlocal started,mark_attempted
             if started:raise ResearchBlocked('SHARED_QUOTA_DUPLICATE_DISPATCH')
+            if kind=='research':
+                mark_attempted=True
+                try:
+                    marked=self._ledger.mark_research_dispatched(lease)
+                except Exception:
+                    raise ResearchBlocked('SHARED_QUOTA_DISPATCH_UNVERIFIED') from None
+                if marked is not True:
+                    raise ResearchBlocked('SHARED_QUOTA_DISPATCH_UNVERIFIED')
             started=True
         try:
             yield start
         except BaseException:
-            if not started:
+            if not started and not mark_attempted:
                 self._finish(lease)
             # On ambiguous physical failure retain the lease until independently
             # reconciled. An HTTP/business error after dispatch can also block.

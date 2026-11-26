@@ -11,6 +11,7 @@ class Ledger:
     def __init__(self):self.claims=[];self.finished=[]
     def claim(self,kind,limit):
         self.claims.append((kind,limit));return len(self.claims)
+    def mark_research_dispatched(self,lease):return True
     def finish(self,lease):self.finished.append(lease);return True
     def status(self,limit):return {'unfinished_foreground':0,'unfinished_research':0,'completion_buffered':0,'policy_cap':limit}
 
@@ -107,3 +108,29 @@ def test_worker_does_not_repeat_provider_failure_even_with_progress():
            client_factory=lambda:SimpleNamespace(session=SimpleNamespace(close=lambda:None)),runner=runner,
            emit=lambda e,v:calls.append(e))
     assert calls.count('run')==1 and calls[-1]=='research_collection_stop'
+
+def test_legacy_unknown_reservation_is_never_recovered():
+    calls=[]
+    db=Ledger()
+    db.status=lambda limit:{'unfinished_foreground':0,'unfinished_research':1,'legacy_unknown_research':1,
+        'undispatched_research':0,'dispatched_unconfirmed_research':0,'completion_buffered':0,'policy_cap':limit}
+    db.recover_undispatched_research=lambda limit:pytest.fail('legacy must not be recovered')
+    worker(threading.Event(),state,None,SharedRequestGate(db,3,operational_policy=True),'fake',
+           wait=lambda n:False,session_probe=lambda d:{'direct_connection_status':'READ_OK','session_probe_verified':True},
+           client_factory=lambda:pytest.fail('must not connect'),
+           emit=lambda e,v:calls.append((e,v)))
+    assert calls[-1][1]['reason']=='UNFINISHED_SHARED_RESERVATION'
+
+def test_worker_rechecks_recovered_reservation_before_token():
+    calls=[]
+    db=Ledger()
+    statuses=iter([{'unfinished_foreground':0,'unfinished_research':1,'undispatched_research':1},
+                   {'unfinished_foreground':0,'unfinished_research':0,'undispatched_research':0}])
+    db.status=lambda limit:next(statuses)
+    db.recover_undispatched_research=lambda limit:1
+    worker(threading.Event(),state,None,SharedRequestGate(db,3,operational_policy=True),'fake',
+           wait=lambda n:False,session_probe=lambda d:{'direct_connection_status':'READ_OK','session_probe_verified':True},
+           client_factory=lambda:SimpleNamespace(session=SimpleNamespace(close=lambda:None)),
+           runner=lambda *a,**kw:{'status':'BLOCKED','coverage':{'stored_rows':150},'collection':{'new_rows':0}},
+           emit=lambda e,v:calls.append((e,v)))
+    assert [e for e,v in calls]==['research_quota_probe','research_undispatched_recovery','research_quota_probe','research_collection_pass']
