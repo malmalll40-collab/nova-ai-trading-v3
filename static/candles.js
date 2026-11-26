@@ -210,7 +210,17 @@
    const r=base?.candle_research;
    return r?.status==='READY'&&Array.isArray(r.observations)?r.observations:[];
  }
- function researchReady(){return timeframe==='analysis' && current?.chart && getResearchRows().length>0;}
+ function researchReady(){return base?.mode==='스윙' && ['analysis','1d'].includes(timeframe) && current?.chart && getResearchRows().length>0;}
+ function matchedResearch(x,i){
+   if(!researchReady()||x.partial?.[i]||x.display_only?.[i])return null;
+   const day=chartDate(x.dates[i]),r=researchLookup.get(day),b=base.chart;
+   if(!r||r.completed!==true||!Number.isFinite(r.price_close))return null;
+   const idx=b.dates.findIndex(t=>chartDate(t)===day);
+   if(idx<0||b.partial?.[idx]||b.display_only?.[idx])return null;
+   const same=(a,z)=>Number.isFinite(a)&&Number.isFinite(z)&&Math.abs(a-z)<=Math.max(1e-6,Math.abs(z)*1e-8);
+   if(!['open','high','low','close','volume'].every(key=>same(x[key]?.[i],b[key]?.[idx]))||!same(r.price_close,b.close[idx]))return null;
+   return r;
+ }
  function chartDate(s){return String(s||'').slice(0,10);}
  function makeResearchElement(tag,klass,text){
    const el=document.createElement(tag);if(klass)el.className=klass;
@@ -232,7 +242,7 @@
    const status=byId('candleResearchStatus');
    const r=base?.candle_research;
    if(status)status.textContent=r?.status==='READY'?
-     `과거 완료 일봉 ${rows.length}개 분석 · 기본 차트는 KIS이며 신호 표시는 '분석 주기'에서만 제공됩니다. 5-Core 시장지수 ${r.market_reference_status==='READY'?'조회 가능':'미확인'}.`:
+     `과거 완료 일봉 ${rows.length}개 분석 · 분석 주기와 일봉에서 동일 완료봉(OHLCV 일치)에만 신호를 표시합니다. 5-Core 시장지수 ${r.market_reference_status==='READY'?'조회 가능':'미확인'}.`:
      `과거 캔들 연구 ${r?.reason||'자료가 아직 없습니다.'}`;
    const roles=byId('candleResearchRoleStats');if(roles){roles.replaceChildren();
      for(const a of r?.role_statistics||[]){
@@ -256,8 +266,9 @@
      return;
    }
    if(select)select.disabled=false;
-   const r=researchLookup.get(date);
-   if(!r){if(status)status.textContent='분석 주기 차트의 과거 완료봉을 누르거나 날짜를 선택하세요.';return;}
+   const idx=current.chart.dates.findIndex(x=>chartDate(x)===date);
+   const r=idx<0?null:matchedResearch(current.chart,idx);
+   if(!r){if(status)status.textContent='분석 주기 또는 일봉의 일치하는 완료봉을 선택하세요. 봉 자료가 다르면 신호를 표시하지 않습니다.';return;}
    if(select)select.value=r.date;
    if(status)status.textContent=`${r.date} 완료봉 · 당시 13개 역할 판단 및 연구용 5-Core 결과 (나중 가격 정보는 성과 평가에만 사용)`;
    const dir=s=>s==='BUY'?'매수':s==='SELL'?'매도':s==='HOLD'?'관망':'미확인';
@@ -341,7 +352,9 @@
      try{localStorage.setItem('nova4-chart-timeframe','analysis');}catch{}
      void selectPeriod();
    };
-   const toggle=byId('candleResearchOverlay');if(toggle)toggle.addEventListener('change',()=>render());
+   const toggle=byId('candleResearchOverlay'),chartToggle=byId('candleChartOverlay');
+   if(toggle)toggle.addEventListener('change',()=>{if(chartToggle)chartToggle.checked=toggle.checked;render();});
+   if(chartToggle)chartToggle.addEventListener('change',()=>{if(toggle)toggle.checked=chartToggle.checked;render();});
    const day=byId('candleResearchDate');if(day)day.addEventListener('change',e=>chooseResearchDate(e.target.value));
 
    byId('candleZoomIn').onclick=()=>{visible=clamp(Math.round(visible*.72),5,125);offset=clamp(offset,0,Math.max(0,(current?.chart?.dates.length||0)-visible));render();};
@@ -429,14 +442,10 @@
    };
    if(mode==='line')drawLine(x.close,'#36e1bb',2.4);
    drawLine(x.ema20,'#9eb8ff',1.4);drawLine(x.ema50,'#e8bc71',1.4);
-   // Only annotate the EXACT analysis-candle series that produced the historical decisions.
-   // A separate KIS 1d/W/M/Y chart can differ by provider and must never display
-   // an unmatched or fabricated signal marker.
+   // Only annotate exact matching completed daily OHLCV. Never project onto W/M/Y or partial bars.
    if(researchReady()&&byId('candleResearchOverlay')?.checked){
-     const rows=researchLookup;
      for(let i=start;i<end;i++){
-       if(x.partial?.[i]||x.display_only?.[i])continue;
-       const r=rows.get(chartDate(x.dates[i]));if(!r)continue;
+       const r=matchedResearch(x,i);if(!r)continue;
        const xx=bx(i),above=clamp(y(x.high[i])-10,top+5,pBottom-7),below=clamp(y(x.low[i])+11,top+6,pBottom-6);
        if(r.baseline==='BUY'||r.baseline==='SELL'){
          const buy=r.baseline==='BUY';ctx.beginPath();ctx.arc(xx,buy?below:above,3.6,0,Math.PI*2);
@@ -472,7 +481,9 @@
    const endIndex=hovered!=null&&hovered<end&&hovered>=start?hovered:end-1;
    const incomplete=(x.partial?.[endIndex]?' · 미완성 봉(현재 기간)':'')+(x.display_only?.[endIndex]?' · 차트 전용 / 분석 미반영':'');
    const indicators=(x.ema20?.[endIndex]==null?' · EMA20 자료 부족':'')+(x.ema50?.[endIndex]==null?' · EMA50 자료 부족':'');
-   byId('candleDetails').textContent=`${periodStamp(x.dates[endIndex],true)}${incomplete} · 시 ${fmt(x.open[endIndex])} / 고 ${fmt(x.high[endIndex])} / 저 ${fmt(x.low[endIndex])} / 종 ${fmt(x.close[endIndex])} · 거래량 ${fmt(x.volume[endIndex])}${indicators}`;
+   const historicalSignal=matchedResearch(x,endIndex);
+   const signalNote=historicalSignal&&byId('candleResearchOverlay')?.checked?' · 과거 13역할 '+({BUY:'매수',SELL:'매도',HOLD:'관망'}[historicalSignal.baseline]||'미확인')+' / 5-Core '+({BUY:'매수',SELL:'매도',HOLD:'관망'}[historicalSignal.five_core]||'미확인')+' (재구성 연구)':'';
+   byId('candleDetails').textContent=`${periodStamp(x.dates[endIndex],true)}${incomplete} · 시 ${fmt(x.open[endIndex])} / 고 ${fmt(x.high[endIndex])} / 저 ${fmt(x.low[endIndex])} / 종 ${fmt(x.close[endIndex])} · 거래량 ${fmt(x.volume[endIndex])}${indicators}${signalNote}`;
    showResearch(x.display_only?.[endIndex]?null:chartDate(x.dates[endIndex]));
  }
  function setCurrent(data){
