@@ -33,10 +33,8 @@ SAFE_ADMISSION_STOPS=frozenset(('ACCOUNT_QUOTA_UNVERIFIED','ACCOUNT_QUOTA_STALE'
 
 def session_dates(start,end):
     """Calendar labels are expected sessions, not proof of historical trading."""
-    import exchange_calendars as ec
-    cal=ec.get_calendar('XKRX',start=(start-timedelta(days=10)).isoformat(),
-                        end=(end+timedelta(days=10)).isoformat())
-    return tuple(x.date() for x in cal.sessions_in_range(start.isoformat(),end.isoformat()))
+    from krx_calendar_verified import get_krx_session_dates
+    return get_krx_session_dates(start,end)
 
 
 class Budget:
