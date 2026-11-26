@@ -1,3 +1,4 @@
+from nova_release import APP_VERSION
 from pathlib import Path
 from fastapi.testclient import TestClient
 import server
@@ -57,10 +58,10 @@ def test_non_remembered_cookie_is_browser_session_only(monkeypatch):
 
 
 def test_new_mobile_ui_and_service_worker():
-    html=Path(server.ASSETS/'index.html').read_text(encoding='utf-8')
+    html=server.index().body.decode('utf-8')
     js=Path(server.ASSETS/'app.js').read_text(encoding='utf-8')
     assert 'rememberDevice' in html and 'logoutButton' in html
     assert '/api/auth/login' in js and '/api/auth/status' in js and '/api/auth/logout' in js
     assert 'nova3-shell-v45' in Path(server.ASSETS/'sw.js').read_text()
-    assert 'Trading Mobile v5.7.0' in html
+    assert ('Trading Mobile v'+APP_VERSION) in html
     assert server.app.title == 'NOVA AI Trading Mobile'
