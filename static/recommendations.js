@@ -10,7 +10,8 @@
   const money=v=>v==null?'—':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:1}).format(Number(v)/1e8)+'억원';
   const headers=()=>{const h={};try{const t=sessionStorage.getItem('nova3-token');if(t)h.Authorization='Bearer '+t;}catch{}return h;};
   const status=(message,warn=false)=>{const p=$('recommendStatus');if(p){p.textContent=message;p.classList.toggle('warn',warn);}};
-  function setSearchState(kind,{message='',progress=null}={}){
+  function setSearchState(kind,{message='',progress=null,interrupted=false}={}){
+    if(kind==='idle'&&interrupted)kind='interrupted';
     const panel=$('recommendScanState'),label=$('recommendScanLabel'),detail=$('recommendScanDetail');
     const icon=$('recommendScanIcon'),count=$('recommendScanCount'),bar=$('recommendProgressTrack'),fill=$('recommendProgressFill'),button=$('recommendScan');
     if(!panel||!label||!detail||!icon||!count||!bar||!fill||!button)return;
@@ -19,9 +20,9 @@
     const done=Math.max(0,Number(progress?.done)||0),total=Number(progress?.total)||0;
     const hasRealProgress=running&&phase==='deep'&&total>0;
     panel.dataset.state=kind;panel.dataset.phase=hasRealProgress?'deep':running?'provider':'none';
-    const names={idle:'검색 대기',running:'검색 진행 중',complete:'검색 완료',failed:'검색 실패',unavailable:'검색 상태 확인 불가'};
+    const names={idle:'검색 대기',running:'검색 진행 중',complete:'검색 완료',failed:'검색 실패',interrupted:'이전 검색 완료 미확인',unavailable:'검색 상태 확인 불가'};
     label.textContent=names[kind]||names.idle;
-    icon.textContent=running?'↻':finished?'✓':kind==='failed'||kind==='unavailable'?'!':'○';
+    icon.textContent=running?'↻':finished?'✓':kind==='failed'||kind==='interrupted'||kind==='unavailable'?'!':'○';
     detail.textContent=message||(running?'시세 및 분석 자료를 확인하고 있습니다.':finished?'최종 결과가 아래에 표시됩니다.':'검색 버튼을 누르면 진행 상황이 표시됩니다.');
     if(hasRealProgress){
       const bounded=Math.min(done,total),percent=Math.round(bounded/total*100);
@@ -171,7 +172,7 @@
     const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
     const msg=({queued:'독립 검색 대기 · 앞선 검색 완료 후 자동 시작',cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
     const wait=(lost?' · 이전 검색의 완료 여부 미확인(서버 재시작 또는 작업 변경). 필요하면 다시 검색하세요.':'')+(other&&!active?' · 다른 검색 실행 중에도 독립 요청 가능':'');
-    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'||lost?'failed':'idle',{message:msg+wait,progress:d.progress});status(msg+wait,lost);}
+    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg+wait,progress:d.progress,interrupted:lost});status(msg+wait,lost);}
     else if($('patternStatus'))$('patternStatus').textContent=(active&&d.status==='running'?'검색 진행 중 · '+msg:msg)+wait;
     const button=$(pre+'Scan');if(button)button.disabled=Boolean(submitting||active||!ready);
     const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=!['queued','running'].includes(d.status)||!d.job_id;
