@@ -139,6 +139,7 @@
   const options=p=>({market:$(prefix(p)+'Market')?.value||'all',source:$(prefix(p)+'Source')?.value||'auto',depth:Number($(prefix(p)+'Depth')?.value||48),profile:p});
   function applyState(p,d){
     jobs[p]=d;
+    window.NOVAHome?.scanState(p,d);
     const pre=prefix(p), active=activeStates.includes(d.status), other=d.active_profile&&d.active_profile!==p;
     const o=options(p),ready=o.source==='fsc'?d.fsc_configured:o.source==='krx'?d.krx_configured:d.fsc_configured||d.krx_configured;
     const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
@@ -181,6 +182,7 @@
       $('recommendNumbers').hidden=true;
       $('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();
       jobs.full={};jobs.pattern={};
+      window.NOVAHome?.scanState('full',null);window.NOVAHome?.scanState('pattern',null);
       setSearchState('unavailable',{message:'검색 상태 확인 실패 · 작업 중단 여부 미확인 · 자동 재연결'});
       status(e.message,true);
       for(const p of ['full','pattern']){const pre=prefix(p);$(pre+'Scan').disabled=true;$(pre+'Cancel').disabled=true;}
