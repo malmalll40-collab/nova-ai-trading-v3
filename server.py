@@ -2278,7 +2278,10 @@ def _ops_preflight_snapshot():
     ):
         with lock:
             jobs[name]=state.get('status')
-    return snapshot(now,schedule,KIS_LOAD.snapshot(),jobs)
+    result=snapshot(now,schedule,KIS_LOAD.snapshot(),jobs)
+    # Observe existing manual KRX diagnostic lock, not a shared quota grant.
+    result['krx_manual_busy']=KRX_DIAG_LOCK.locked()
+    return result
 
 
 def _ops_preflight_loop(stop):
