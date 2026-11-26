@@ -330,7 +330,12 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         market=demo_data(mode)
     elif source in ('auto','kis'):
         key,secret=_kis_creds()
-        market=kis_data(symbol,mode,key,secret,scan_asof=asof_date) if scan_profile is not None else kis_data(symbol,mode,key,secret)
+        if scan_profile is not None:
+            from nova_v593_scan_cache import CACHE as verified_cache
+            account_scope=hashlib.sha256((key+'\0'+secret).encode()).hexdigest()
+            market=verified_cache.fetch(symbol,asof_date,account_scope,lambda:kis_data(symbol,mode,key,secret,scan_asof=asof_date))
+        else:
+            market=kis_data(symbol,mode,key,secret)
         resolved_source='kis'
     else:
         raise ValueError('KIS 전용 분석입니다. Yahoo는 수동 비교 진단에서만 사용합니다.')
@@ -342,7 +347,7 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         report=getattr(market,'daily_integrity',None) or {}
         if scan_profile is not None and report.get('scan_asof')==asof_date:
             raw=report.get('raw_scan_freshness')
-            if isinstance(raw,dict):scan_freshness=dict(raw)
+            if isinstance(raw,dict):scan_freshness=dict(raw,scan_cache=report.get('scan_cache'))
             else:scan_freshness=dict(scan_freshness,stale=True,state='RAW_COVERAGE_MISSING')
             if report.get('signal_hold') or not report.get('verified'):
                 scan_freshness=dict(scan_freshness,stale=True,state=report.get('state','INTEGRITY_UNVERIFIED'),reason=report.get('reason','기준일 봉 검증 실패'))
@@ -1707,10 +1712,10 @@ def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: i
             except Exception:
                 logging.getLogger('nova.autotrack').warning('Market scan evidence persistence failed')
         result['elapsed_seconds']=round(time.monotonic()-started,2)
-        logging.getLogger('uvicorn.error').info('NOVA_SCAN profile=%s depth=%s asof=%s elapsed_seconds=%.2f deep_target=%s deep_succeeded=%s deep_failed=%s strict=%s interest=%s assessment=%s exclusion_codes=%s',
+        logging.getLogger('uvicorn.error').info('NOVA_SCAN profile=%s depth=%s asof=%s elapsed_seconds=%.2f deep_target=%s deep_succeeded=%s deep_failed=%s strict=%s interest=%s assessment=%s exclusion_codes=%s cache=%s',
             profile,depth,result.get('data_date'),result['elapsed_seconds'],result.get('deep_target'),result.get('deep_succeeded'),
             result.get('deep_failed'),result.get('recommended_count'),result.get('interest_count'),
-            result.get('scan_assessment'),result.get('rejection_codes'))
+            result.get('scan_assessment'),result.get('rejection_codes'),result.get('scan_cache_counts'))
         with SCAN_LOCK:
             if state.get('job_id')==job_id:
                 state.update(status='complete',result=result,error=None,
