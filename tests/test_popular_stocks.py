@@ -137,6 +137,6 @@ def test_popular_ui_naver_external_and_charts():
     assert 'rel="noopener noreferrer"' in html
     assert '/static/popular.js' in html and "'/static/popular.js'" in sw
     assert 'NOVAConnect?.openRecommendation' in js
-    assert "['analyze','recommendations','backtest'" in appjs
+    assert "['home','analyze','recommendations','backtest'" in appjs
     assert 'popular-results' in css
     assert not any(x in html.lower() for x in ['네이버 자동 스크래핑', '나스닥 검색'])

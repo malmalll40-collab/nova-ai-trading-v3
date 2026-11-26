@@ -18,6 +18,7 @@ def test_chart_is_first_in_analyze_view_after_search():
     children=[x for x in analyze.children if getattr(x, 'name', None)]
     assert children[0].name=='nav' and 'analysis-jump' in children[0].get('class',[])
     assert children[1].get('id')=='chartPanel'
+    assert analyze.select_one('#chartPanel .v6-decision-summary') is not None
     assert analyze.select_one('#chartPanel') is not None
     assert analyze.select_one('#tradeDecisionPanel') is not None
     assert str(analyze).index('id="chartPanel"') < str(analyze).index('id="tradeDecisionPanel"')
@@ -74,7 +75,7 @@ def test_search_jump_does_not_affect_auto_refresh():
     assert "analyze({jumpToChart:true})" in js
     assert 'if(jumpToChart)' in js
     assert "if(target.tagName==='DETAILS')target.open=true" in js
-    assert "if(!document.hidden&&!pending)analyze();" in js
+    assert "if(!document.hidden&&!pending&&view==='analyze')analyze();" in js
 
 
 def test_pwa_cache_is_bumped_and_finance_remains_read_only():

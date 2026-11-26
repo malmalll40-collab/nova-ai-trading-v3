@@ -119,7 +119,7 @@ def test_new_shell_chart_scripts_news_view_and_no_news_in_trading_logic():
     assert 'id="candleCanvas"' in h and 'id="candleDetails"' in h
     assert 'data-view="news"' in h and 'id="view-news"' in h
     assert 'id="newsSearchExternal"' in h
-    assert h.count('class="nav-item')==9
+    assert h.count('class="nav-item')==10
     assert 'static/candles.js' in h and 'static/news.js' in h
     assert Path(server.ASSETS/'candles.js').exists()
     assert Path(server.ASSETS/'news.js').exists()
