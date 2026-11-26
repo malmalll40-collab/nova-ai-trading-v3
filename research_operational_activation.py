@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from nova_v574_data_audit import KST
 from ops_preflight import TERMINAL
 from nova_v578_kis_telemetry import KIS_LOAD
+from nova_v579_admission import PROVIDER_STOPS
 from research_kis_shared_quota import SharedQuotaLedger
 from research_kis_transport_gate import SharedRequestGate
 
@@ -36,6 +37,10 @@ def summarize(r):
          'collection_reason':a.get('reason'),'new_rows':a.get('new_rows',0),
          'logical_calls':a.get('logical_calls',0),'strategy_adoption':'HOLD','orders_enabled':False,
          'account_quota_verified':False,'independent_future_verified':False}
+    diagnostic=a.get('window_diagnostic')
+    if isinstance(diagnostic,dict):
+        out['window_diagnostic']={k:diagnostic[k] for k in ('symbol','reason','pages','expected_sessions',
+            'observed_sessions','unexpected_sessions','missing_sessions','first','last','anchors_expected','anchors_observed') if k in diagnostic}
     if e:
         out['evaluation_status']=e.get('status')
         out['signal_dates']=e.get('signal_dates');out['opportunities']=e.get('opportunities')
@@ -64,6 +69,16 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
     p=session_probe(dsn)
     if p.get('direct_connection_status')!='READ_OK' or p.get('session_probe_verified') is not True:
         emit('research_collection_stop',{'reason':'DIRECT_SESSION_UNAVAILABLE','orders_enabled':False})
+        return
+    # Inspect outstanding reservations before token or collection requests.
+    try:
+        quota=gate.status()
+        emit('research_quota_probe',quota)
+        if quota['unfinished_foreground'] or quota['unfinished_research']:
+            emit('research_collection_stop',{'reason':'UNFINISHED_SHARED_RESERVATION','orders_enabled':False})
+            return
+    except Exception:
+        emit('research_collection_stop',{'reason':'SHARED_QUOTA_STATUS_UNAVAILABLE','orders_enabled':False})
         return
     # Existing KIS encrypted token cache handles issuance if expired; no new
     # credential access, no token values logged. Only one client per worker.
@@ -96,6 +111,11 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
                 for k,metrics in evaluation.get('ml',{}).get('cohorts',{}).items():
                     emit('research_ml_result',{'cohort':k,'overall':metrics.get('overall'),'research_only':True})
             full=out['expected_rows'] is not None and out['stored_rows']==out['expected_rows']
+            if (out['collection_reason'] in PROVIDER_STOPS
+                    or out['collection_reason'] in ('WINDOW_INTEGRITY_REJECTED','SHARED_QUOTA_RELEASE_UNVERIFIED',
+                        'ADJUSTED_HISTORY_OVERLAP_CONFLICT','OVERLAP_ANCHOR_MISSING')):
+                emit('research_collection_stop',{'reason':out['collection_reason'],'orders_enabled':False})
+                break
             if full or out['status'] in ('RESEARCH_COMPLETE','INSUFFICIENT_EVIDENCE') or out['new_rows']<=0:
                 break
             if wait(5):break

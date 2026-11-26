@@ -51,7 +51,10 @@ def main():
     assert abandoned
     time.sleep(BUFFER_SECONDS+0.2)
     assert ledger.claim('research',4) is None
+    status=ledger.status(4)
+    assert status['unfinished_foreground']==1 and status['unfinished_research']==0
     assert ledger.finish(abandoned)
+    assert ledger.status(4)['unfinished_foreground']==0
     print('Shared quota ledger PASS: cross-connection cap, foreground priority, completion buffer, abandoned lease blocking')
     tx=transaction_factory(dsn)
     days=tuple(date(2026,11,23)+timedelta(days=i) for i in range(3))

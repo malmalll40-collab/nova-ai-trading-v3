@@ -79,6 +79,18 @@ class SharedQuotaLedger:
             cur.execute(f'INSERT INTO {TABLE}(lease_id,kind) VALUES (%s,%s)',(lease.lease_id,kind))
             return lease
 
+    def status(self,limit):
+        """Read-only counts; never clears an uncertain lease."""
+        with self._tx() as cur:
+            self._check_policy(cur,limit)
+            cur.execute(f"""SELECT count(*) FILTER (WHERE kind='foreground' AND finished_at IS NULL),
+                count(*) FILTER (WHERE kind='research' AND finished_at IS NULL),
+                count(*) FILTER (WHERE finished_at IS NOT NULL AND finished_at > clock_timestamp() - (%s * interval '1 second'))
+                FROM {TABLE}""",(BUFFER_SECONDS,))
+            foreground,research,buffered=cur.fetchone()
+            return {'unfinished_foreground':foreground,'unfinished_research':research,
+                    'completion_buffered':buffered,'policy_cap':limit}
+
     def finish(self,lease):
         """Idempotence: repeated finish cannot shorten the safety buffer."""
         if not isinstance(lease,Claim):raise ValueError('INVALID_LEASE')

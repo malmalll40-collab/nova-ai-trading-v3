@@ -126,3 +126,32 @@ def test_internal_gap_checks_both_edges(db):
     assert api.calls[0]['FID_INPUT_DATE_1']=='20261123'
     assert api.calls[0]['FID_INPUT_DATE_2']=='20261125'
     assert not r['adjustment_basis_verified_across_runs'] and not r['training_ready']
+
+def test_provider_stop_preserves_only_validated_anchor_and_previous_pages(db):
+    from nova_v579_admission import ResearchBlocked
+    with db() as (cur,kind):
+        dataset=initialize(cur,kind,D)
+        append(cur,kind,dataset,SYMBOLS[0],{D[-1]:{'close':100}})
+    class Interrupted(API):
+        def get(self,*args):
+            if self.calls:
+                raise ResearchBlocked('RESEARCH_HTTP_FAILURE_429')
+            p=super().get(*args)
+            p['output2']=[row for row in p['output2'] if row['stck_bsop_date']!='20261123']
+            return p
+    r=run(db,Interrupted())
+    assert r['reason']=='RESEARCH_HTTP_FAILURE_429' and r['new_rows']==1
+    assert r['window_diagnostic']['anchors_observed']==1
+    assert r['window_diagnostic']['observed_sessions']==2
+    with db() as (cur,kind):
+        assert set(saved(cur,kind,dataset,SYMBOLS[0]))==set(D[1:])
+
+def test_integrity_rejection_exposes_safe_detail_without_writes(db):
+    class Bad(API):
+        def get(self,*args):
+            p=super().get(*args)
+            p['output2'].append({'stck_bsop_date':'20261123','bstp_nmix_prpr':'999'})
+            return p
+    r=run(db,Bad())
+    assert r['reason']=='WINDOW_INTEGRITY_REJECTED' and r['new_rows']==0
+    assert r['window_diagnostic']['reason']=='CONFLICTING_DUPLICATE'

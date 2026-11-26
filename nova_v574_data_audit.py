@@ -99,8 +99,8 @@ def collect(api,symbol,start,end,expected,budget,*,max_pages=MAX_PAGES,pause=tim
                 payload=api.get(INDEX_PATH if index else STOCK_PATH,
                                 'FHKUP03500100' if index else 'FHKST03010100',params)
             except Exception as exc:
-                from nova_v579_admission import ResearchBlocked
-                if isinstance(exc,ResearchBlocked) and str(exc) in SAFE_ADMISSION_STOPS:
+                from nova_v579_admission import ResearchBlocked,PROVIDER_STOPS
+                if isinstance(exc,ResearchBlocked) and str(exc) in (SAFE_ADMISSION_STOPS | PROVIDER_STOPS):
                     raise ProbeError(str(exc)) from None
                 raise ProbeError('PROVIDER_REQUEST_FAILED') from None
             if not isinstance(payload,dict) or not isinstance(payload.get('output2'),list):

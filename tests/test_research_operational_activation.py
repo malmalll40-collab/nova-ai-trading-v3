@@ -12,6 +12,7 @@ class Ledger:
     def claim(self,kind,limit):
         self.claims.append((kind,limit));return len(self.claims)
     def finish(self,lease):self.finished.append(lease);return True
+    def status(self,limit):return {'unfinished_foreground':0,'unfinished_research':0,'completion_buffered':0,'policy_cap':limit}
 
 def state():
     from ops_preflight import JOBS
@@ -69,7 +70,7 @@ def test_worker_resumes_and_stops_on_no_progress():
     worker(threading.Event(),state,None,SharedRequestGate(Ledger(),3,operational_policy=True),'fake',
            wait=lambda n:False,session_probe=lambda d:{'direct_connection_status':'READ_OK','session_probe_verified':True},
            client_factory=lambda:SimpleNamespace(session=SimpleNamespace(close=lambda:None)),runner=runner,
-           emit=lambda e,v:calls.append(v))
+           emit=lambda e,v:calls.append(v) if e=='research_collection_pass' else None)
     assert [v['new_rows'] for v in calls]==[100,0]
     assert all(v['strategy_adoption']=='HOLD' and not v['orders_enabled'] for v in calls)
 
@@ -83,3 +84,26 @@ def test_foreground_wait_bounded_before_claim():
     gate=SharedRequestGate(db,3,operational_policy=True,clock=lambda:t[0],pause=lambda n:t.__setitem__(0,t[0]+n))
     with gate.slot('foreground') as start:start()
     assert t[0]==.5 and db.finished==[1]
+
+def test_worker_stops_before_token_when_uncertain_shared_lease():
+    calls=[]
+    db=Ledger()
+    db.status=lambda limit:{'unfinished_foreground':0,'unfinished_research':1,'completion_buffered':0,'policy_cap':limit}
+    worker(threading.Event(),state,None,SharedRequestGate(db,3,operational_policy=True),'fake',
+           wait=lambda n:False,session_probe=lambda d:{'direct_connection_status':'READ_OK','session_probe_verified':True},
+           client_factory=lambda:pytest.fail('must not connect'),
+           emit=lambda e,v:calls.append((e,v)))
+    assert calls[-1][1]['reason']=='UNFINISHED_SHARED_RESERVATION'
+    assert not db.claims and not db.finished
+
+def test_worker_does_not_repeat_provider_failure_even_with_progress():
+    calls=[]
+    def runner(*a,**kw):
+        calls.append('run')
+        return {'status':'BLOCKED','coverage':{'stored_rows':150},
+                'collection':{'new_rows':100,'reason':'RESEARCH_HTTP_FAILURE_429'}}
+    worker(threading.Event(),state,None,SharedRequestGate(Ledger(),3,operational_policy=True),'fake',
+           wait=lambda n:False,session_probe=lambda d:{'direct_connection_status':'READ_OK','session_probe_verified':True},
+           client_factory=lambda:SimpleNamespace(session=SimpleNamespace(close=lambda:None)),runner=runner,
+           emit=lambda e,v:calls.append(e))
+    assert calls.count('run')==1 and calls[-1]=='research_collection_stop'
