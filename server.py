@@ -2062,7 +2062,9 @@ def _start_ops(full=True):
 def _start_v574_data_probe(version='574'):
     """Startup-only, explicit research diagnostic mode. Never runs full batch."""
     from ops_diagnostics import emit
-    if version=='575':
+    if version=='576':
+        from nova_v576_expanded_coverage import pilot, quiet_window, GuardedBudget, MAX_CALLS, MAX_SECONDS
+    elif version=='575':
         from nova_v575_calendar_coverage import pilot
     elif version=='574':
         from nova_v574_data_audit import pilot
@@ -2073,6 +2075,9 @@ def _start_v574_data_probe(version='574'):
     schedule=krx_session(now)
     if not schedule.get('calendar_verified') or schedule.get('status')!='CLOSED':
         emit(event+'_end',{'status':'SKIPPED','reason':'MARKET_OPEN_OR_UNVERIFIED','strategy_adoption':'HOLD'})
+        return 'skipped'
+    if version=='576' and not quiet_window(now,schedule):
+        emit(event+'_end',{'status':'SKIPPED','reason':'QUIET_WINDOW_REQUIRED','strategy_adoption':'HOLD'})
         return 'skipped'
     with OPS_LOCK:
         if OPS_STATE['status']=='running':return 'running'
@@ -2087,7 +2092,13 @@ def _start_v574_data_probe(version='574'):
         started=time.monotonic()
         try:
             key,secret=_kis_creds()
-            result=pilot(KIS(key,secret),now,progress=lambda stats:emit(event+'_stream',stats))
+            kwargs={}
+            if version=='576':
+                def guard():
+                    current=datetime.now(KST)
+                    return quiet_window(current,krx_session(current))
+                kwargs['budget']=GuardedBudget(guard,max_calls=MAX_CALLS,max_seconds=MAX_SECONDS)
+            result=pilot(KIS(key,secret),now,progress=lambda stats:emit(event+'_stream',stats),**kwargs)
         except Exception:
             pass # never log provider exceptions
         finally:
@@ -2140,6 +2151,7 @@ def _ops_startup():
     if os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1':_start_ops(True)
     elif os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='574':_start_v574_data_probe()
     elif os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='575':_start_v574_data_probe('575')
+    elif os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='576':_start_v574_data_probe('576')
 
 
 
