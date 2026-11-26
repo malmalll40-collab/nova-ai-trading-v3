@@ -1,6 +1,6 @@
 """Passive process-local KIS telemetry. Never claims account-wide quota verification."""
 from collections import deque
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 import threading
 import time
@@ -11,8 +11,9 @@ MAX_EVENTS=8192
 
 
 class LocalTelemetry:
-    def __init__(self,clock=time.monotonic,wall=lambda:datetime.now(timezone.utc)):
+    def __init__(self,clock=time.monotonic,wall=lambda:datetime.now(timezone.utc),*,shared_gate=None):
         self._clock=clock;self._wall=wall
+        self._shared_gate=shared_gate
         self._lock=threading.Lock()
         self._active=0;self._physical_active=0
         self._attempts=deque();self._errors=deque()
@@ -39,45 +40,65 @@ class LocalTelemetry:
         finally:
             with self._lock:self._active-=1
 
+    def _shared_slot(self,kind):
+        # No production installation. The same gate must cover every physical
+        # consumer before any account-wide evidence can be trusted.
+        return (self._shared_gate.slot(kind) if self._shared_gate is not None
+                else nullcontext(lambda:None))
+
     @contextmanager
     def physical(self,*,retry=False,token=False):
-        with self._lock:
-            self._physical_active+=1;self._total+=1
-            self._retry_total+=int(retry);self._token_total+=int(token)
-            self._append(self._attempts,self._clock())
-        try:yield
-        except Exception:
-            self.failure()
-            raise
-        finally:
-            with self._lock:self._physical_active-=1
+        with self._shared_slot('foreground') as start:
+            with self._lock:
+                self._physical_active+=1;self._total+=1
+                self._retry_total+=int(retry);self._token_total+=int(token)
+                self._append(self._attempts,self._clock())
+            try:
+                start()
+                yield
+            except Exception:
+                self.failure()
+                raise
+            finally:
+                with self._lock:self._physical_active-=1
+
+    def _research_reason(self,proof,now):
+        from nova_v579_admission import admission_reason
+        self._prune(self._attempts,now);self._prune(self._errors,now)
+        self._prune(self._research_attempts,now)
+        return admission_reason(proof,self._wall(),foreground=self._active,
+            physical=self._physical_active,research=self._research_active,
+            errors=len(self._errors),overflow=now<self._overflow_until,
+            starts=tuple(self._research_attempts),monotonic_now=now)
 
     @contextmanager
     def research_attempt(self,proof):
-        """Atomic local admission; foreground never waits for research.
-        Proof must come from a trusted account-wide coordinator (not installed).
-        This is a per-attempt gate, not a reservation of global provider quota.
+        """Require independent proof and recheck after shared reservation.
+
+        The optional ledger is another guard, not evidence of account quota.
+        A refused reservation is never counted as a physical request.
         """
-        from nova_v579_admission import admission_reason, ResearchBlocked
+        from nova_v579_admission import ResearchBlocked
         with self._lock:
-            now=self._clock()
-            self._prune(self._attempts,now);self._prune(self._errors,now)
-            self._prune(self._research_attempts,now)
-            reason=admission_reason(proof,self._wall(),foreground=self._active,
-                physical=self._physical_active,research=self._research_active,
-                errors=len(self._errors),overflow=now<self._overflow_until,
-                starts=tuple(self._research_attempts),monotonic_now=now)
+            reason=self._research_reason(proof,self._clock())
             if reason:raise ResearchBlocked(reason)
-            self._research_active+=1;self._physical_active+=1
-            self._total+=1;self._research_total+=1
-            self._append(self._attempts,now);self._append(self._research_attempts,now)
-        try:yield
-        except Exception:
-            self.failure()
-            raise
-        finally:
+        with self._shared_slot('research') as start:
             with self._lock:
-                self._physical_active-=1;self._research_active-=1
+                now=self._clock()
+                reason=self._research_reason(proof,now)
+                if reason:raise ResearchBlocked(reason)
+                self._research_active+=1;self._physical_active+=1
+                self._total+=1;self._research_total+=1
+                self._append(self._attempts,now);self._append(self._research_attempts,now)
+            try:
+                start()
+                yield
+            except Exception:
+                self.failure()
+                raise
+            finally:
+                with self._lock:
+                    self._physical_active-=1;self._research_active-=1
 
     def failure(self):
         with self._lock:self._append(self._errors,self._clock())
