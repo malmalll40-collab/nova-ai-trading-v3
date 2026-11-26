@@ -1,4 +1,5 @@
 """Offline, deterministic tests. All financial response numbers are fabricated fixtures."""
+from nova_release import APP_VERSION
 import io
 import json
 import zipfile
@@ -136,7 +137,7 @@ def test_fastapi_requires_auth_and_key(monkeypatch):
     r=TestClient(server.app).get('/api/fundamentals?symbol=123456.KQ',headers={'Authorization':'Bearer '+'Z'*22})
     assert r.status_code==503
     assert r.json()['detail']['code']=='no_key'
-    assert TestClient(server.app).get('/healthz').json()['app_version']=='5.7.0'
+    assert TestClient(server.app).get('/healthz').json()['app_version']==APP_VERSION
 
 
 def test_fastapi_finance_fixture(monkeypatch):
