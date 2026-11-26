@@ -102,6 +102,8 @@ def run_exclusive(dsn,api,sessions,*,now,calendar,admission,
         with exclusive_run(dsn,session_mode_confirmed=session_mode_confirmed,connect=connect) as alive:
             if alive is None:
                 return {**blocked,'reason':'DUPLICATE_RUN'}
+            if callable(getattr(api,'bind_lock',None)):
+                api.bind_lock(alive)
             return resume(api,sessions,transaction=transaction_factory(dsn,connect=connect),now=now,calendar=calendar,
                           admission=lambda:alive() and admission() is True,**limits)
     except Exception:

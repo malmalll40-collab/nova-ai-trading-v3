@@ -24,6 +24,12 @@ INDEX_PATH='/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice'
 class ProbeError(ValueError):
     pass
 
+# Only explicit control-plane stops can preserve earlier validated pages.
+SAFE_ADMISSION_STOPS=frozenset(('ACCOUNT_QUOTA_UNVERIFIED','ACCOUNT_QUOTA_STALE',
+    'QUOTA_HEADROOM_LOW','FOREGROUND_BUSY','PHYSICAL_REQUEST_BUSY','PROVIDER_UNHEALTHY',
+    'RESEARCH_MINUTE_LIMIT','RESEARCH_PACING','TOKEN_UNAVAILABLE','PASS_DEADLINE',
+    'QUIET_WINDOW_ENDED','RUN_ADMISSION_REVOKED'))
+
 
 def session_dates(start,end):
     """Calendar labels are expected sessions, not proof of historical trading."""
@@ -93,7 +99,11 @@ def collect(api,symbol,start,end,expected,budget,*,max_pages=MAX_PAGES,pause=tim
             try:
                 payload=api.get(INDEX_PATH if index else STOCK_PATH,
                                 'FHKUP03500100' if index else 'FHKST03010100',params)
-            except Exception:raise ProbeError('PROVIDER_REQUEST_FAILED') from None
+            except Exception as exc:
+                from nova_v579_admission import ResearchBlocked
+                if isinstance(exc,ResearchBlocked) and str(exc) in SAFE_ADMISSION_STOPS:
+                    raise ProbeError(str(exc)) from None
+                raise ProbeError('PROVIDER_REQUEST_FAILED') from None
             if not isinstance(payload,dict) or not isinstance(payload.get('output2'),list):
                 raise ProbeError('INVALID_PAYLOAD')
             raw=payload['output2']

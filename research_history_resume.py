@@ -6,12 +6,12 @@ No automatic scheduling, order path, or strategy adoption.
 """
 from datetime import datetime
 import time
-from nova_v574_data_audit import KST, collect, ProbeError, MAX_PAGES, MAX_INDEX_PAGES, INDEX_CODES
+from nova_v574_data_audit import KST, collect, ProbeError, MAX_PAGES, MAX_INDEX_PAGES, INDEX_CODES, SAFE_ADMISSION_STOPS
 from nova_v576_expanded_coverage import GROUPS, GroupBudget, GuardedBudget, MAX_CALLS, MAX_SECONDS, GROUP_PAUSE_SECONDS, quiet_window
 from research_history_checkpoint import initialize, missing_windows, append, manifest, saved
 
 SAFE_PARTIAL = frozenset(('WINDOW_REACHED','PROVIDER_EMPTY','PAGE_LIMIT','BUDGET_EXHAUSTED',
-                          'GROUP_BUDGET_EXHAUSTED','FOREGROUND_BUSY','PROVIDER_UNHEALTHY','QUIET_WINDOW_ENDED'))
+                          'GROUP_BUDGET_EXHAUSTED','FOREGROUND_BUSY','PROVIDER_UNHEALTHY','QUIET_WINDOW_ENDED')) | SAFE_ADMISSION_STOPS
 MAX_WINDOWS = 22
 
 def resume(api, sessions, *, transaction, now, calendar, admission, pause=time.sleep,
