@@ -4,7 +4,7 @@ No fabricated quota proof, token issuance, scheduler or provider retry.
 A trusted installed coordinator must supply a fresh reservation for each GET.
 """
 import time
-from nova_v579_admission import ResearchHistoryClient,ResearchBlocked,QuotaEvidence,MIN_HEADROOM,MAX_PROOF_AGE
+from nova_v579_admission import ResearchHistoryClient,ResearchBlocked
 from nova_v576_expanded_coverage import corrected_sessions,quiet_window,MAX_CALLS,MAX_SECONDS
 from nova_v574_data_audit import session_dates
 from research_history_status import START,END
@@ -15,10 +15,13 @@ INTERVAL=5.1
 class PacedClient:
     def __init__(self,client,guard,*,clock=time.monotonic,pause=time.sleep,deadline):
         self.client=client;self.guard=guard;self.clock=clock;self.pause=pause
-        self.deadline=deadline;self.last=None
+        self.deadline=deadline;self.last=None;self.lock_guard=lambda:False
+
+    def bind_lock(self,alive):
+        self.lock_guard=alive
 
     def get(self,path,tr_id,params):
-        if not self.guard():
+        if not self.lock_guard() or not self.guard():
             raise ResearchBlocked('RUN_ADMISSION_REVOKED')
         now=self.clock()
         wait=0 if self.last is None else max(0,self.last+INTERVAL-now)
@@ -28,7 +31,7 @@ class PacedClient:
             self.pause(wait)
         if self.clock()>=self.deadline:
             raise ResearchBlocked('PASS_DEADLINE')
-        if not self.guard():
+        if not self.lock_guard() or not self.guard():
             raise ResearchBlocked('RUN_ADMISSION_REVOKED')
         self.last=self.clock()
         return self.client.get(path,tr_id,params)
