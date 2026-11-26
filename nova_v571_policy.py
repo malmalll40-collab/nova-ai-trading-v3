@@ -96,7 +96,27 @@ def historical(frames, symbols, horizon, cost):
                 'blocked_wins': sum(r['net_pct'] > 0 for r in blocked), 'blocked_nonpositive': sum(r['net_pct'] <= 0 for r in blocked),
                 'scored': len(scored), 'brier': brier('probability'), 'naive_brier': brier('naive_probability'),
                 'states': dict(Counter(r['decision']['state'] for r in data))}
+    # Reserve the final 20% of signal dates (minimum 20). Freeze BOTH
+    # policy models before the split; no test-period labels update them.
+    days = frames[0][0][:len(frames[0][2])]
+    holdout = {'status':'INSUFFICIENT','strategy_adoption':'HOLD',
+               'independent_future_verified':False,'model_updates_in_holdout':0}
+    if len(days)>=100:
+        cut=days[(len(days)*4)//5]
+        train=[r for r in rows if r['exit_day']<cut]
+        train571=fit(train,cut,cost); train570=fit570(train,cut,cost)
+        tail=[{**r,'decision':decide(r,train571),'v570':decide570(r,train570)}
+              for r in rows if r['day']>=cut]
+        summary=compare(tail)
+        holdout={**holdout,'status':'READY' if summary['matched_calibration']['scored'] else 'INSUFFICIENT',
+                 'basis':'FIXED_CHRONOLOGICAL_HISTORICAL_HOLDOUT','start':cut,'end':days[-1],
+                 'training_rows':len(train),'last_training_exit':max((r['exit_day'] for r in train),default=None),
+                 'signal_dates':len(days)-(len(days)*4)//5,
+                 'overall':summary,
+                 'by_market':{g:compare([r for r in tail if r['market_regime']==g]) for g in MARKETS},
+                 'by_regime':{g:compare([r for r in tail if r['subregime']==g]) for g in REGIMES}}
     return {'version': VERSION, 'status': 'READY', 'basis': 'HISTORICAL_CAUSAL_REPLAY',
+            'frozen_holdout':holdout,
             'strategy_adoption': 'HOLD', 'research_only': True, 'independent_future_verified': False,
             'overall': compare(rows), 'by_regime': {g: compare([r for r in rows if r['subregime'] == g]) for g in REGIMES},
             'by_market': {g: compare([r for r in rows if r['market_regime'] == g]) for g in MARKETS},
