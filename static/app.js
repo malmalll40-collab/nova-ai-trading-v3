@@ -94,9 +94,11 @@ function setConnection(label,active=false,fail=false){
 function storeConfig(){if(!PREVIEW)safeStore.set('nova3-config',config);}
 function displayMode(){document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===config.mode));}
 function selectView(next){
+  if(!['home','analyze','recommendations','backtest','research','finance','watchlist','news','guide'].includes(next))return;
   view=next;
+  document.body.classList.toggle('home-open',next==='home');
   if(next==='watchlist'||next==='research')$('results').hidden=false;
-  else if(next==='guide'||next==='news'||next==='recommendations'||!latest)$('results').hidden=true;
+  else if(next==='home'||next==='guide'||next==='news'||next==='recommendations'||!latest)$('results').hidden=true;
   else $('results').hidden=false;
   document.body.classList.toggle('research-open',next==='research');
   document.body.classList.toggle('research-no-stock',next==='research'&&!latest);
@@ -105,11 +107,12 @@ function selectView(next){
   document.body.classList.toggle('guide-open',next==='guide');
   document.body.classList.toggle('news-open',next==='news');
   document.body.classList.toggle('recommendations-open',next==='recommendations');
-  ['analyze','recommendations','backtest','research','finance','watchlist','news','guide'].forEach(x=>{
+  ['home','analyze','recommendations','backtest','research','finance','watchlist','news','guide'].forEach(x=>{
     const p=$('view-'+x);p.hidden=x!==next;
     document.querySelector(`[data-view="${x}"]`).classList.toggle('active',x===next);
   });
   window.NOVAV5?.onViewChange(next);
+  if(next==='home')renderHome();
   if(next==='watchlist')renderWatchlist();
   if(next==='news')window.NOVANews?.load();
   window.NOVAScanner?.onViewChange(next);
@@ -119,8 +122,46 @@ function selectView(next){
   window.NOVAMonitor?.onViewChange(next);
   if(next==='finance')loadFinance();
   if((next==='backtest'||next==='research')&&latest){renderBacktest(latest);window.NOVAJournal?.render();}
-  if(next==='guide'||next==='recommendations'||next==='research')window.scrollTo({top:0,behavior:'instant'});
+  if(next==='home'||next==='guide'||next==='recommendations'||next==='research')window.scrollTo({top:0,behavior:'instant'});
 }
+function recentStockRows(){
+  const rows=safeStore.get('nova-v6-recent-symbols',[]);
+  return Array.isArray(rows)?rows.filter(r=>r&&/^\d{6}\.(KS|KQ)$/.test(r.symbol)&&['1분','5분','15분','스윙'].includes(r.mode)).slice(0,8):[];
+}
+function rememberRecent(d){
+  if(PREVIEW||d.is_demo||!/^\d{6}\.(KS|KQ)$/.test(d.symbol)||!['1분','5분','15분','스윙'].includes(d.mode))return;
+  const rows=recentStockRows().filter(r=>r.symbol!==d.symbol);
+  safeStore.set('nova-v6-recent-symbols',[{symbol:d.symbol,mode:d.mode,name:String(getStockName(d.symbol)||d.symbol).slice(0,60)},...rows].slice(0,8));
+}
+function renderHome(){
+  const el=$('v6RecentStocks');if(!el)return;
+  el.replaceChildren();
+  const rows=recentStockRows();
+  if(!rows.length){const p=document.createElement('p');p.className='note';p.textContent='최근 분석한 국내 종목이 없습니다.';el.append(p);return;}
+  for(const r of rows){
+    const b=document.createElement('button');b.type='button';b.className='v6-recent-button';
+    b.textContent=(r.name||r.symbol)+' · '+r.symbol+' · '+r.mode;
+    b.onclick=()=>{if(PREVIEW)return;$('symbolInput').value=r.symbol;config.mode=r.mode;if(config.source==='demo')config.source='kis';$('sourceSelect').value=config.source;storeConfig();displayMode();selectView('analyze');analyze({jumpToChart:true});};
+    el.append(b);
+  }
+}
+async function refreshHomeMarket(){
+  const b=$('v6MarketRefresh');if(!b||b.disabled||PREVIEW)return;
+  b.disabled=true;setText('v6MarketStatus','거래일 달력 확인 중');
+  try{
+    const token=safeSession.get('nova3-token'),r=await fetch('/api/market/session',{headers:token?{'Authorization':'Bearer '+token}:{},credentials:'same-origin',cache:'no-store'});
+    if(!r.ok)throw Error('조회 실패');const d=await r.json();
+    setText('v6MarketStatus',d.calendar_verified===true?(d.is_open?'KRX 정규장 거래 중':'KRX 정규장 운영 시간 밖'):'정규장 운영 상태 미확인');
+    setText('v6MarketMeta','확인 시각 '+String(d.as_of||'미확인').slice(0,25)+' · NXT/애프터마켓 미포함');
+  }catch{setText('v6MarketStatus','시장 운영 상태 미확인');setText('v6MarketMeta','다시 조회해 주세요. 거래 종료를 추정하지 않습니다.');}
+  finally{b.disabled=false;}
+}
+window.NOVAHome={scanState:(profile,d)=>{
+  const id=profile==='full'?'v6HomeFull':'v6HomePattern',label=profile==='full'?'전체 시장':'신호패턴';
+  const state={idle:'대기',queued:'검색 대기',running:'진행 중',cancelling:'취소 중',finalizing:'결과 정리 중',cancelled:'취소',failed:'실패',complete:'완료'}[d?.status]||'확인 불가';
+  const date=String(d?.result?.data_date||'');
+  setText(id,label+' · '+state+(date?' · 기준일 '+date:'')+' · 마지막 확인 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
+}};
 function isTicker(s){return /^\d{6}\.(KS|KQ)$/.test(s.toUpperCase());}
 function searchUI(items=[],notice=''){
   const el=$('searchSuggestions');
@@ -509,12 +550,16 @@ function renderQualityBacktest(d){
 function render(d){
   latest=d;
   document.body.classList.remove('research-no-stock');
-  $('results').hidden=['guide','news','recommendations'].includes(view);
+  $('results').hidden=['home','guide','news','recommendations'].includes(view);
   updateStockIdentity(d.is_demo?'DEMO':d.symbol);
   setText('dataMode',d.mode==='스윙'?'일봉 스윙 분석':d.mode+'봉 분석');
   setText('signalLabel',d.signal_label);
   setText('signalDescription',d.final_reason || (d.is_stale?'지난 완료봉 참고 · 실시간 매매 판단 아님':'현재 분석 결과는 미래 수익을 보장하지 않습니다.'));
   setText('signalTimestamp',shortTime(d.last_completed_bar));
+  setText('v6SignalLabel',d.is_stale?'신호 보류':d.signal_label);setText('v6SignalDate',shortTime(d.last_completed_bar));
+  setText('v6SignalReason',d.final_reason||(d.is_stale?'시세 검증 보류':'완료봉 기준 참고 판단'));
+  setText('v6Reference',format(d.reference,d.currency));setText('v6Stop',format(d.long_stop_reference,d.currency));setText('v6Target',format(d.long_target_reference,d.currency));
+  rememberRecent(d);
   setText('signalCircle',compareIcon(d.signal));
   const sig=document.querySelector('.signal-card');sig.classList.toggle('sell',d.signal==='SELL');sig.classList.toggle('hold',d.signal==='HOLD');
   $('demoWarning').hidden=!d.is_demo;
@@ -730,7 +775,7 @@ function renderFinance(d){
 function scheduleRefresh(){
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(config.auto&&!PREVIEW)refreshTimer=setInterval(()=>{
-    if(!document.hidden&&!pending)analyze();
+    if(!document.hidden&&!pending&&view==='analyze')analyze();
   },60000);
 }
 function init(){
@@ -762,6 +807,8 @@ function init(){
   $('searchForm').addEventListener('submit',e=>{e.preventDefault();safeStore.set('nova3-symbol',$('symbolInput').value.trim());selectView('analyze');analyze({jumpToChart:true});});
   document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{config.mode=b.dataset.mode;storeConfig();displayMode();analyze();});
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>selectView(b.dataset.view));
+  $('v6MarketRefresh')?.addEventListener('click',refreshHomeMarket);
+  document.querySelectorAll('[data-v6-recommend-target]').forEach(b=>b.addEventListener('click',()=>{const e=$(b.dataset.v6RecommendTarget);if(!e)return;if(e.tagName==='DETAILS')e.open=true;e.scrollIntoView({behavior:'smooth',block:'start'});}));
   document.querySelectorAll('[data-research-target]').forEach(b=>b.onclick=()=>{if(view!=='research')selectView('research');$(b.dataset.researchTarget)?.scrollIntoView({behavior:'smooth',block:'start'});});
   document.querySelectorAll('[data-scroll-target]').forEach(b=>b.addEventListener('click',()=>{
     if(view!=='analyze')selectView('analyze');
@@ -820,7 +867,7 @@ function init(){
   window.addEventListener('online',()=>setConnection('네트워크 연결됨'));
   window.addEventListener('offline',()=>setConnection('오프라인',false,true));
   window.NOVAJournal?.init();
-  scheduleRefresh();renderWatchlist();window.NOVAMonitor?.afterChange();analyze();
+  scheduleRefresh();renderWatchlist();window.NOVAMonitor?.afterChange();if(PREVIEW){selectView('analyze');analyze();}else selectView('home');
 }
 window.NOVAConnect={
   refreshVerified:async(symbol)=>{
