@@ -379,6 +379,30 @@ def interest_candidate_rank_key(candidate: dict):
             -(rr if rr is not None else -1.),str(candidate.get('symbol','')))
 
 
+def assess_scan_outcome(result:dict)->dict:
+    """Explain strict zero without turning incomplete observations into a market verdict."""
+    if result.get('scan_profile')=='pattern':
+        return {'status':'PATTERN_ONLY'}
+    target=result['deep_target']; success=result['deep_succeeded']; failed=result['deep_failed']
+    strict=result['recommended_count']; codes=result['rejection_codes']
+    uncertain={'DEMO','PRICE_STALE','SNAPSHOT_DATE_LAG','ASOF_MISMATCH','NOT_SWING',
+               'FINANCIAL_UNVERIFIED','BAR_NOT_CURRENT','DEEP_ANALYSIS_ERROR','UNKNOWN'}
+    data_limited=sum(n for k,n in codes.items() if k in uncertain)
+    # First rejection only; separate data uncertainty from model eligibility, not all gates.
+    consistent=success+failed==target and strict+sum(codes.values())==target
+    if not consistent: status='COUNT_MISMATCH'
+    elif not target: status='NO_SCREENED_CANDIDATES'
+    elif failed or data_limited or result.get('snapshot_date_status')=='OLDER_THAN_EXPECTED':
+        status='DATA_LIMITED'
+    elif strict: status='STRICT_CANDIDATES'
+    else: status='NO_STRICT_CANDIDATES'
+    return {'status':status,'deep_target':target,'deep_succeeded':success,'deep_failed':failed,
+            'strict_count':strict,'interest_count':result['interest_count'],
+            'data_limited_first_rejections':data_limited,
+            'validation_first_rejections':sum(codes.get(k,0) for k in ('VALIDATION_UNVERIFIED','VALIDATION_WEAK')),
+            'count_consistent':consistent,'scope':'BOUNDED_DEEP_SCAN','first_rejection_only':True}
+
+
 def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
                     analyze_asof: Callable[[str,str],dict]|None=None,
                     progress: Callable[[dict],None]|None=None, now: datetime|None=None,
@@ -538,6 +562,7 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
         result['method']='동일 일별 스냅샷 및 후보 선별 → 신호패턴 전용 검증 (엄격 매수/관심 순위 미실행)'
         result['recommended_count']=None
         result['interest_count']=None
+    result['scan_assessment']=assess_scan_outcome(result)
 
     checkpoint()
     if progress:progress({'phase':'complete','done':len(top),'total':len(top),
