@@ -4,7 +4,7 @@ Never infer that a weekday is open.  A missing calendar always fails closed.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from threading import RLock
 
 _CALENDAR_LOCK = RLock()
@@ -63,3 +63,30 @@ def previous_completed_date(calendar, day: date, is_session: bool, after_close: 
                 else at_or_prior.date())
     except Exception:
         raise CalendarUnavailable('XKRX_PREVIOUS_SESSION_FAILED') from None
+
+def get_krx_session_dates(start: date, end: date):
+    """Use the same initialization lock for bounded historical calendar reads.
+
+    A cached calendar may have a narrower range; never substitute weekdays.
+    Retry initialization once under the lock, with identical bounds.
+    """
+    if type(start) is not date or type(end) is not date or not 0 <= (end-start).days <= 1200:
+        raise CalendarUnavailable('XKRX_RANGE_INVALID')
+    with _CALENDAR_LOCK:
+        try:
+            import exchange_calendars as ec
+        except (ImportError,OSError):
+            raise CalendarUnavailable('XKRX_IMPORT_UNAVAILABLE') from None
+        for _ in range(2):
+            try:
+                cal=ec.get_calendar('XKRX',start=(start-timedelta(days=10)).isoformat(),
+                                    end=(end+timedelta(days=10)).isoformat())
+                if cal.first_session.date()>start or cal.last_session.date()<end:
+                    raise ValueError('RANGE_NOT_COVERED')
+                days=tuple(x.date() for x in cal.sessions_in_range(start.isoformat(),end.isoformat()))
+                if not days or tuple(sorted(set(days)))!=days or any(not start<=d<=end for d in days):
+                    raise ValueError('INVALID_SESSIONS')
+                return days
+            except Exception:
+                pass
+        raise CalendarUnavailable('XKRX_HISTORY_LOAD_FAILED') from None
