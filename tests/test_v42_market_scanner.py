@@ -180,8 +180,8 @@ def test_ui_accessibility_and_no_fake_results():
     j=(server.ASSETS/'recommendations.js').read_text(encoding='utf8')
     sw=(server.ASSETS/'sw.js').read_text(encoding='utf8')
     assert 'id="view-recommendations"' in h and 'data-view="recommendations"' in h
-    assert h.count('class="nav-item')==9
-    assert 'KRX_API_KEY' in h and '최대 8개' in h
+    assert h.count('class="nav-item')==10
+    assert 'KRX_API_KEY' in h and '24·48·60개' in h
     assert 'textContent' in j and 'NOVAScanner' in j
     assert '/static/recommendations.js' in sw and 'nova3-shell-v45' in sw
     assert server.app.openapi_url is None
