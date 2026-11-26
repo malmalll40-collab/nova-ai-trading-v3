@@ -43,7 +43,10 @@ class VerifiedScanCache:
         cutoff=datetime.strptime(asof,'%Y%m%d').date()
         # Session boundary partitions: never carry pre-close raw coverage over
         # into post-close/settlement, and never cross a Korean calendar day.
-        phase=0 if moment.hour<9 else 1 if moment.hour<15 or (moment.hour==15 and moment.minute<30) else 2 if moment.hour<18 else 3 if moment.hour<20 else 4
+        from market_sessions import SPECIAL_HOURS
+        opening,closing,_=SPECIAL_HOURS.get(moment.date().isoformat(),('09:00','15:30',''))
+        hm=moment.strftime('%H:%M')
+        phase=0 if hm<opening else 1 if hm<closing else 2 if hm<'18:00' else 3 if hm<'20:00' else 4
         key=(account_scope,symbol,asof,moment.date(),phase)
         use_cache=cutoff<moment.date()
         if use_cache:
