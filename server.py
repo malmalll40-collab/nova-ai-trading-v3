@@ -15,7 +15,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -81,9 +81,9 @@ async def _app_lifespan(application):
 app = FastAPI(title='NOVA AI Trading Mobile', docs_url=None, redoc_url=None, openapi_url=None, lifespan=_app_lifespan)
 app.mount('/static', StaticFiles(directory=ASSETS), name='static')
 CACHE_LOCK = threading.Lock()
-# Fixed-size lock stripes coalesce identical concurrent provider downloads
-# without serializing all symbols under the global cache lock.
-CACHE_KEY_LOCKS = [threading.Lock() for _ in range(64)]
+# Exact-key locks coalesce identical requests without unrelated hash collisions.
+# Reference counts include waiters; the registry is bounded by active requests.
+CACHE_KEY_LOCKS = {}
 CACHE = {}
 RATE = {}
 CACHE_TTL = 52
@@ -213,15 +213,33 @@ def _limit(request: Request):
             RATE.clear()
 
 
+@contextmanager
+def _cache_key_lock(key):
+    with CACHE_LOCK:
+        entry = CACHE_KEY_LOCKS.get(key)
+        if entry is None:
+            entry = [threading.Lock(), 0]
+            CACHE_KEY_LOCKS[key] = entry
+        entry[1] += 1
+    try:
+        with entry[0]:
+            yield
+    finally:
+        with CACHE_LOCK:
+            entry[1] -= 1
+            if entry[1] == 0:
+                del CACHE_KEY_LOCKS[key]
+
+
 def _cached(key, make, ttl=CACHE_TTL):
-    # Double-check under a per-key stripe: concurrent requests for the same
+    # Double-check under an exact-key lock: concurrent requests for the same
     # symbol should not simultaneously hit Yahoo/Naver/KIS quota limits.
     now = time.monotonic()
     with CACHE_LOCK:
         entry = CACHE.get(key)
         if entry and now-entry[0] <= ttl:
             return dict(entry[1], cached=True, cache_age_seconds=round(now-entry[0]))
-    with CACHE_KEY_LOCKS[hash(key) % len(CACHE_KEY_LOCKS)]:
+    with _cache_key_lock(key):
         now = time.monotonic()
         with CACHE_LOCK:
             entry = CACHE.get(key)
