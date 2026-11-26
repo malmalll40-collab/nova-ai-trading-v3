@@ -78,10 +78,12 @@
     if(res.selection_lanes){const p=document.createElement('p');p.className='note';p.textContent=`후보 구성: 유동성 ${res.selection_lanes['유동성']||0}개 · 거래활동 ${res.selection_lanes['거래활동']||0}개 · 수급 자료 확보 관심후보 ${res.flow_auxiliary_coverage||0}개. 수급은 매수 승인에 사용하지 않습니다.`;list.append(p);}
     if(res.scan_freshness_method){const p=document.createElement('p');p.className='note';p.textContent=`시세 신선도: ${res.scan_freshness_method} · 현재가가 아닌 기준일 스윙 연구`;list.append(p);}
     const items=Array.isArray(res.recommendations)?res.recommendations:[];
+    const assessment=res.scan_assessment;
+    if(assessment){const p=document.createElement('p');p.className='note';const labels={NO_STRICT_CANDIDATES:'분석한 후보 중 엄격 매수 기준 통과 없음',DATA_LIMITED:'자료·검증 제한: 전체 후보가 평가되었다고 볼 수 없음',COUNT_MISMATCH:'검증 집계 불일치: 결과 신뢰 보류',NO_SCREENED_CANDIDATES:'1차 선별 통과 종목 없음',STRICT_CANDIDATES:'엄격 매수 후보 확인'};p.textContent=(labels[assessment.status]||'판정 미확인')+' · 자료 미확인/오류 사유 '+(assessment.data_limited_first_rejections??'미확인')+'개 · 독립 검증 부족 '+(assessment.validation_first_rejections??'미확인')+'개 (첫 제외 사유 기준)';list.append(p);}
     const strictHeading=document.createElement('h3');strictHeading.textContent=`엄격 매수 후보 · ${items.length}개`;list.append(strictHeading);
     if(items.length){const ranking=document.createElement('p');ranking.className='recommend-rank-intro';ranking.textContent='엄격 매수 순위: 최근 별도 검증의 Wilson 신뢰하한 → 평균 순수익 → 검증 표본 → 손익비 순. 같은 검색 결과 안에서의 상대 순위이며 실제 상승 확률이나 매수 우선 명령이 아닙니다.';list.append(ranking);}
     if(!items.length){const blank=document.createElement('div');blank.className='recommend-empty';
-      blank.textContent=(res.deep_failed?'심층 자료 조회 실패가 있어 일부 평가가 불완전합니다. ':'')+'이번 검색에서 모든 기술·재무·검증 조건을 통과한 종목이 없습니다. 추천 개수를 맞추기 위해 무리하게 추가하지 않습니다.';
+      blank.textContent=(assessment?.status==='NO_STRICT_CANDIDATES'?'검토한 후보에서 모든 엄격 매수 조건을 통과한 종목이 없습니다.':assessment?.status==='NO_SCREENED_CANDIDATES'?'1차 선별을 통과한 종목이 없어 심층 평가하지 않았습니다.':'엄격 매수 0개 · 자료 제한 또는 판정 근거 미확인 상태에서는 추천할 종목이 실제로 없는지 확정할 수 없습니다.')+' 추천 개수를 맞추기 위해 무리하게 추가하지 않습니다.';
       list.appendChild(blank);}
     for(const [i,r] of items.entries()){
       const card=document.createElement('article');card.className='recommend-card';
@@ -131,7 +133,7 @@
         info.append(p);}list.append(info);}
   }
   const jobs={full:{},pattern:{}};
-  const activeStates=['running','cancelling','finalizing'];
+  const activeStates=['queued','running','cancelling','finalizing'];
   const prefix=p=>p==='full'?'recommend':'pattern';
   const options=p=>({market:$(prefix(p)+'Market')?.value||'all',source:$(prefix(p)+'Source')?.value||'auto',depth:Number($(prefix(p)+'Depth')?.value||48),profile:p});
   function applyState(p,d){
@@ -139,12 +141,12 @@
     const pre=prefix(p), active=activeStates.includes(d.status), other=d.active_profile&&d.active_profile!==p;
     const o=options(p),ready=o.source==='fsc'?d.fsc_configured:o.source==='krx'?d.krx_configured:d.fsc_configured||d.krx_configured;
     const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
-    const msg=({cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
-    const wait=other&&!active?' · 다른 검색이 실행 중입니다. 완료 후 시작할 수 있습니다.':'';
+    const msg=({queued:'독립 검색 대기 · 앞선 검색 완료 후 자동 시작',cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
+    const wait=other&&!active?' · 다른 검색 실행 중에도 독립 요청 가능':'';
     if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg+wait,progress:d.progress});status(msg+wait);}
     else if($('patternStatus'))$('patternStatus').textContent=(active&&d.status==='running'?'검색 진행 중 · '+msg:msg)+wait;
-    const button=$(pre+'Scan');if(button)button.disabled=Boolean(submitting||active||other||!ready);
-    const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=d.status!=='running'||!d.job_id;
+    const button=$(pre+'Scan');if(button)button.disabled=Boolean(submitting||active||!ready);
+    const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=!['queued','running'].includes(d.status)||!d.job_id;
     const target=p==='full'?'recommendResults':'patternResults';
     const matches=d.market===o.market&&d.depth===o.depth&&(o.source==='auto'?(d.fsc_configured?'fsc':'krx')===d.source:o.source===d.source);
     if(d.status==='complete'&&d.result&&matches){
@@ -197,7 +199,7 @@
     finally{submitting=false;await fetchState();}
   }
   async function cancel(p){
-    const d=jobs[p];if(!d.job_id||d.status!=='running')return;
+    const d=jobs[p];if(!d.job_id||!['queued','running'].includes(d.status))return;
     $(prefix(p)+'Cancel').disabled=true;
     try{
       const r=await fetch('/api/recommendations/cancel',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({profile:p,job_id:d.job_id}),cache:'no-store'});
