@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import requests
 from engine import clean_bars
+from nova_v578_kis_telemetry import KIS_LOAD
 
 MINUTE_INTERVALS = {'1분': 1, '5분': 5, '15분': 15}
 KST=ZoneInfo('Asia/Seoul')
@@ -162,16 +163,24 @@ class KIS:
         if not key.strip() or not secret.strip():raise ValueError('KIS App Key와 App Secret을 모두 입력하세요')
         self.key,self.secret=key.strip(),secret.strip()
         self.session=requests.Session()
-        self.token=self._token()
+        with KIS_LOAD.foreground():
+            self.token=self._token()
 
     def _request_token(self)->tuple[str,int]:
         try:
-            r=self.session.post(self.BASE+'/oauth2/tokenP',json={'grant_type':'client_credentials',
-                'appkey':self.key,'appsecret':self.secret},timeout=12)
-            r.raise_for_status()
-            data=r.json()
+            with KIS_LOAD.physical(token=True):
+                r=self.session.post(self.BASE+'/oauth2/tokenP',json={'grant_type':'client_credentials',
+                    'appkey':self.key,'appsecret':self.secret},timeout=12)
+            try:
+                r.raise_for_status()
+                data=r.json()
+            except (requests.RequestException,ValueError):
+                KIS_LOAD.failure()
+                raise
             token=data.get('access_token')
-            if not token:raise ValueError('토큰이 응답에 없습니다')
+            if not token:
+                KIS_LOAD.failure()
+                raise ValueError('토큰이 응답에 없습니다')
             duration=int(data.get('expires_in',3600))
             return token, duration
         except (requests.RequestException,ValueError,KeyError) as exc:
@@ -195,6 +204,10 @@ class KIS:
             return token
 
     def get(self,path:str,tr_id:str,params:dict)->dict:
+        with KIS_LOAD.foreground():
+            return self._get_foreground(path,tr_id,params)
+
+    def _get_foreground(self,path:str,tr_id:str,params:dict)->dict:
         headers={'authorization':f'Bearer {self.token}', 'appkey':self.key,
                  'appsecret':self.secret,'tr_id':tr_id,'custtype':'P','content-type':'application/json; charset=utf-8'}
         # GET quotes are read-only. Retry a transient HTTP failure or timeout
@@ -202,7 +215,8 @@ class KIS:
         # Preserve *only* a non-sensitive status category for chart diagnostics.
         for attempt in range(2):
             try:
-                response=self.session.get(self.BASE+path,headers=headers,params=params,timeout=12)
+                with KIS_LOAD.physical(retry=attempt>0):
+                    response=self.session.get(self.BASE+path,headers=headers,params=params,timeout=12)
             except requests.Timeout:
                 if attempt == 0:
                     time.sleep(1.0)
@@ -215,6 +229,7 @@ class KIS:
                 raise RuntimeError('KIS_UPSTREAM_NETWORK') from None
             status=int(getattr(response,'status_code',0))
             if not 200 <= status < 300:
+                KIS_LOAD.failure()
                 if status in (429,500,502,503,504) and attempt == 0:
                     time.sleep(2.0 if status == 429 else 1.0)
                     continue
@@ -222,10 +237,13 @@ class KIS:
             try:
                 data=response.json()
             except ValueError:
+                KIS_LOAD.failure()
                 raise RuntimeError('KIS_BAD_JSON') from None
             if not isinstance(data,dict):
+                KIS_LOAD.failure()
                 raise RuntimeError('KIS_BAD_PAYLOAD') from None
             if data.get('rt_cd')!='0':
+                KIS_LOAD.failure()
                 # Existing broker-code behavior retained. Never log msg1,
                 # credentials, headers, URL query or the full upstream body.
                 raise RuntimeError(f"KIS 시세 오류 {data.get('msg_cd','unknown')}: {str(data.get('msg1',''))[:120]}")

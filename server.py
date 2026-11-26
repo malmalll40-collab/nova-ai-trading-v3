@@ -2124,6 +2124,8 @@ def _start_v574_data_probe(version='574'):
 def _ops_startup():
     from ops_diagnostics import configured, emit
     emit('startup',configured())
+    from nova_v578_kis_telemetry import KIS_LOAD
+    emit('v578_kis_telemetry',KIS_LOAD.snapshot())
     def probe():
         from prospective_collection import checkpoint_probe
         try:emit('checkpoint_probe',checkpoint_probe())
@@ -2174,6 +2176,8 @@ def ops_status(request:Request):
         if snapshot.get('job_id') and snapshot.get('job_id')==BATCH_RESEARCH_STATE.get('job_id'):
             snapshot['progress']=BATCH_RESEARCH_STATE.get('progress')
     snapshot.pop('job_id',None)
+    from nova_v578_kis_telemetry import KIS_LOAD
+    snapshot['kis_load']=KIS_LOAD.snapshot()
     return JSONResponse(snapshot,headers={'Cache-Control':'no-store'})
 
 
