@@ -15,6 +15,18 @@ SYMBOLS=(*INDEX_CODES,*PRESET)
 MAX_CALLS=208
 MAX_SECONDS=300
 MAX_GAP_DATES=20
+GROUPS=(tuple(INDEX_CODES), *(tuple(PRESET[i:i+5]) for i in range(0,len(PRESET),5)))
+GROUP_PAUSE_SECONDS=5
+
+
+class GroupBudget:
+    """Nested group cap; global deadline and call cap remain authoritative."""
+    def __init__(self,parent,symbols):
+        self.parent=parent;self.start=parent.calls
+        self.limit=sum(MAX_INDEX_PAGES if s in INDEX_CODES else MAX_PAGES for s in symbols)
+    def take(self):
+        if self.parent.calls-self.start>=self.limit:raise ProbeError('GROUP_BUDGET_EXHAUSTED')
+        self.parent.take()
 
 
 def corrected_sessions(raw,start,end):
@@ -52,7 +64,7 @@ class GuardedBudget(Budget):
         super().take()
 
 
-def pilot(api,now=None,*,calendar=session_dates,budget=None,pause=time.sleep,progress=None):
+def pilot(api,now=None,*,calendar=session_dates,budget=None,pause=time.sleep,progress=None,grouped=False):
     now=now or datetime.now(KST)
     if now.tzinfo is None:raise ValueError('timezone required')
     end=now.astimezone(KST).date()-timedelta(days=1)
@@ -69,8 +81,16 @@ def pilot(api,now=None,*,calendar=session_dates,budget=None,pause=time.sleep,pro
     except Exception:return {**base,'status':'UNAVAILABLE','reason':'CALENDAR_UNAVAILABLE','streams':[],'logical_calls':0}
     stats=[]; common=None; union=set(); rows=0; stock_rows=0; turnover=0;quality_ready=0
     stop=None
+    groups=GROUPS if grouped else (SYMBOLS,)
+    group_index={s:i for i,g in enumerate(groups) for s in g}
+    active_group=-1;group_budget=b
     for s in SYMBOLS:
-        item,records=collect(api,s,start,end,expected,b,
+        idx=group_index[s]
+        if idx!=active_group:
+            if grouped and active_group>=0:pause(GROUP_PAUSE_SECONDS)
+            active_group=idx
+            group_budget=GroupBudget(b,groups[idx]) if grouped else b
+        item,records=collect(api,s,start,end,expected,group_budget,
             max_pages=MAX_INDEX_PAGES if s in INDEX_CODES else MAX_PAGES,pause=pause)
         gaps=set(expected)-set(records)
         item['missing_dates']=[d.isoformat() for d in sorted(gaps)[:MAX_GAP_DATES]]
@@ -95,7 +115,18 @@ def pilot(api,now=None,*,calendar=session_dates,budget=None,pause=time.sleep,pro
             stop=item['reason'];break
     counts=Counter(x['status'] for x in stats)
     full=len(stats)==len(SYMBOLS) and all(x['reason']=='WINDOW_REACHED' for x in stats)
-    return {**base,'status':'READY' if counts['READY']==len(SYMBOLS) else 'PARTIAL' if rows else 'UNAVAILABLE',
+    group_reports=[]
+    if grouped:
+        for i,g in enumerate(groups):
+            attempted=[x for x in stats if x['symbol'] in g]
+            group_reports.append({'group':i+1,'requested_streams':len(g),'attempted_streams':len(attempted),
+                'ready_streams':sum(x['status']=='READY' for x in attempted),
+                'observed_rows':sum(x['observed_sessions'] for x in attempted),
+                'logical_calls':sum(x['pages'] for x in attempted),
+                'status':'READY' if len(attempted)==len(g) and all(x['status']=='READY' for x in attempted)
+                else 'PARTIAL' if attempted else 'NOT_STARTED'})
+    return {**base,'grouped':grouped,'group_pause_seconds':GROUP_PAUSE_SECONDS if grouped else 0,
+        'groups':group_reports,'status':'READY' if counts['READY']==len(SYMBOLS) else 'PARTIAL' if rows else 'UNAVAILABLE',
         'reason':stop,'calendar':audit,'expected_sessions':len(expected),
         'finished_streams':len(stats),'ready_streams':counts['READY'],
         'expected_rows':len(expected)*len(SYMBOLS),'observed_rows':rows,
