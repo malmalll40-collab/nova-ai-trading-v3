@@ -5,7 +5,7 @@ provider access plus strict cohort schema is required before storage.
 Uncertain dispatched claims remain held; no automatic repeat on errors.
 """
 from contextlib import contextmanager
-from datetime import date
+from datetime import date,datetime
 import json
 import os
 import threading
@@ -16,7 +16,8 @@ from research_history_checkpoint import execute
 from research_krx_snapshot import SERVICES,TABLE,initialize,import_snapshot,coverage,manifest
 from research_krx_access_probe import MAX_BYTES,PARSE_CODES
 from research_history_status import START,END
-from nova_v574_data_audit import session_dates
+from nova_v574_data_audit import session_dates,KST
+from ops_preflight import JOBS,COUNTERS,TERMINAL
 from nova_v576_expanded_coverage import corrected_sessions
 from research_operational_activation import eligible
 
@@ -25,7 +26,11 @@ ORDER=('kospi_dd_trd','kosdaq_dd_trd','stk_bydd_trd','ksq_bydd_trd')
 URLS={s:'https://data-dbg.krx.co.kr/svc/apis/'+('idx/' if s in ORDER[:2] else 'sto/')+s for s in ORDER}
 FLAG='NOVA_KRX_PRIVATE_COLLECTION'
 PILOT_MODE='pilot-20261120-v1'
+# Explicit owner request on 2026-11-27. Expires the same day, never grants batch admission.
+PILOT_NOW_MODE='pilot-now-20261120-20261127-v1'
+PILOT_NOW_DAY=date(2026,11,27)
 BATCH_MODE='bounded-history-v1'
+MODES=(PILOT_MODE,PILOT_NOW_MODE,BATCH_MODE)
 CLAIMS='nova_krx_collection_claim_v1'
 MAX_BATCH_CALLS=12
 LOCK=601576049
@@ -119,15 +124,15 @@ def read_one(session,key,service,day):
 
 def plan(sessions,saved,mode):
     days=tuple(sessions)
-    if PILOT not in days or mode not in (PILOT_MODE,BATCH_MODE):raise ValueError('KRX_PLAN_INVALID')
+    if PILOT not in days or mode not in MODES:raise ValueError('KRX_PLAN_INVALID')
     first=[(s,PILOT) for s in ORDER if (s,PILOT.isoformat()) not in saved]
-    if first or mode==PILOT_MODE:return first
+    if first or mode in (PILOT_MODE,PILOT_NOW_MODE):return first
     return [(s,d) for d in reversed(days) if d!=PILOT for s in ORDER if (s,d.isoformat()) not in saved][:MAX_BATCH_CALLS]
 
 def collect(store,session,key,mode,ready,wait,emit):
     def stop(reason):
         emit('krx_collection_stop',{**BASE,'reason':reason})
-    if not ready() or not key or mode not in (PILOT_MODE,BATCH_MODE):
+    if not ready() or not key or mode not in MODES:
         return stop('ADMISSION_BLOCKED')
     store.setup()
     info,saved,held=store.status()
@@ -148,7 +153,7 @@ def collect(store,session,key,mode,ready,wait,emit):
             # Exact service and day, actual successful provider response,
             # explicitly enabled private collection only. No default True.
             n=store.save(service,day,payload,authorized=lambda s,d:
-                mode in (PILOT_MODE,BATCH_MODE) and state=='success' and (s,d)==(service,day))
+                mode in MODES and state=='success' and (s,d)==(service,day))
         except ValueError as exc:
             # save transaction rolled back, uncertain claim remains held
             code=str(exc)
@@ -160,17 +165,38 @@ def collect(store,session,key,mode,ready,wait,emit):
     emit('krx_collection_coverage',{**BASE,**info})
     return stop('BOUNDED_PASS_COMPLETE')
 
+def admitted(s,mode,now=None):
+    """Owner's time-only exception, not a general override. Same-day, fresh
+    local observations, all known jobs terminal and all KIS counters zero.
+    Does not establish shared KRX/provider quota or atomic exclusion.
+    """
+    if mode!=PILOT_NOW_MODE:return mode in MODES and eligible(s)
+    now=now or datetime.now(KST)
+    if now.tzinfo is None or now.astimezone(KST).date()!=PILOT_NOW_DAY:return False
+    stamp=datetime.fromisoformat(s.get('as_of',''))
+    if stamp.tzinfo is None or not 0<=(now-stamp).total_seconds()<=60:return False
+    jobs=s.get('jobs',{});load=s.get('kis_load',{})
+    return (s.get('calendar_verified') is True and s.get('krx_regular_status') in ('OPEN','CLOSED')
+        and s.get('scope')=='PROCESS_LOCAL_NON_ATOMIC'
+        and set(jobs)==set(JOBS) and all(v in TERMINAL for v in jobs.values())
+        and all(type(load.get(k)) is int and load[k]==0 for k in COUNTERS)
+        and s.get('window_overflow') is False
+        and s.get('orders_enabled') is False and s.get('krx_manual_busy') is False)
+
+
 def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,session_factory=requests.Session,emit=None):
     if emit is None:
         from ops_diagnostics import emit
     wait=wait or stop.wait
     def ready():
-        try:return not stop.is_set() and eligible(snapshot())
+        try:return not stop.is_set() and admitted(snapshot(),mode)
         except Exception:return False
     if wait(120):return
     if not ready() or not dsn or not key:
         return emit('krx_collection_stop',{**BASE,'reason':'ADMISSION_BLOCKED'})
     try:
+        if mode==PILOT_NOW_MODE:
+            emit('krx_collection_admission',{**BASE,'mode':mode,'time_only_exception':True,'max_calls':4,'scope':'PROCESS_LOCAL_NON_ATOMIC'})
         days,_=corrected_sessions(session_dates(START,END),START,END)
         store=store_factory(dsn,days)
         with session_factory() as session:
@@ -180,7 +206,7 @@ def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,s
 
 def start_if_enabled(stop,snapshot):
     mode=os.getenv(FLAG)
-    if mode not in (PILOT_MODE,BATCH_MODE):return False
+    if mode not in MODES:return False
     threading.Thread(target=worker,args=(stop,snapshot,os.getenv('DATABASE_URL','').strip(),
         os.getenv('KRX_API_KEY','').strip(),mode),daemon=True,name='nova-krx-private-collector').start()
     return True

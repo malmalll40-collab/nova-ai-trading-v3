@@ -105,3 +105,54 @@ def test_schema_failure_keeps_claim():
 def test_default_disabled(monkeypatch):
     monkeypatch.delenv(rc.FLAG,raising=False)
     assert rc.start_if_enabled(None,None) is False
+
+
+def test_owner_now_only_pilot_and_never_history():
+    days=(date(2026,11,19),rc.PILOT,date(2026,11,25))
+    assert rc.plan(days,set(),rc.PILOT_NOW_MODE)==[(s,rc.PILOT) for s in rc.ORDER]
+    saved={(s,rc.PILOT.isoformat()) for s in rc.ORDER}
+    assert rc.plan(days,saved,rc.PILOT_NOW_MODE)==[]
+
+def _owner_snapshot():
+    from datetime import datetime
+    from ops_preflight import JOBS,COUNTERS
+    now=datetime(2026,11,27,8,50,tzinfo=rc.KST)
+    return now,{'as_of':now.isoformat(),'calendar_verified':True,'quiet_window':False,
+        'krx_regular_status':'CLOSED','scope':'PROCESS_LOCAL_NON_ATOMIC','orders_enabled':False,
+        'jobs':{k:'idle' for k in JOBS},'kis_load':{k:0 for k in COUNTERS},
+        'window_overflow':False,'krx_manual_busy':False}
+
+def test_owner_now_only_time_override():
+    now,s=_owner_snapshot()
+    assert rc.admitted(s,rc.PILOT_NOW_MODE,now)
+    assert not rc.admitted(s,rc.PILOT_MODE,now)
+    assert not rc.admitted(s,rc.BATCH_MODE,now)
+
+def test_owner_now_rejects_active_unknown_and_manual_busy():
+    now,s=_owner_snapshot()
+    for changes in ({'calendar_verified':False},{'krx_regular_status':'UNKNOWN'},
+        {'scope':'UNKNOWN'},{'orders_enabled':True},{'window_overflow':True},
+        {'krx_manual_busy':True},{'jobs':{}},{'kis_load':{}}):
+        assert not rc.admitted({**s,**changes},rc.PILOT_NOW_MODE,now)
+    for k in s['kis_load']:
+        assert not rc.admitted({**s,'kis_load':{**s['kis_load'],k:1}},rc.PILOT_NOW_MODE,now)
+    for k in s['jobs']:
+        assert not rc.admitted({**s,'jobs':{**s['jobs'],k:'running'}},rc.PILOT_NOW_MODE,now)
+
+def test_owner_now_expires_and_refuses_stale_snapshot():
+    from datetime import timedelta
+    now,s=_owner_snapshot()
+    assert not rc.admitted(s,rc.PILOT_NOW_MODE,now+timedelta(seconds=61))
+    tomorrow=now+timedelta(days=1)
+    assert not rc.admitted({**s,'as_of':tomorrow.isoformat()},rc.PILOT_NOW_MODE,tomorrow)
+
+def test_owner_now_pilot_still_claims_and_stops():
+    store=Store();s=Session([Response({'OutBlock_1':[{'fixture':'secret'}]}) for _ in rc.ORDER])
+    logs=run(store,s,mode=rc.PILOT_NOW_MODE)
+    assert sum(d.get('new_rows',0) for _,d in logs)==22
+    run(store,s,mode=rc.PILOT_NOW_MODE)
+    assert len(s.calls)==4
+
+def test_owner_now_mode_is_not_default(monkeypatch):
+    monkeypatch.setenv(rc.FLAG,'pilot-now')
+    assert rc.start_if_enabled(None,None) is False
