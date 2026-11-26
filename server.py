@@ -50,7 +50,7 @@ from signal_stats import signal_performance
 from higher_timeframes import PERIODS, chart_data, fetch_long_daily, fetch_kis_native_period, latest_kis_period
 from chart_display import display_daily
 from trend_context import summarize_higher_trends
-from market_scanner import run_market_scan, MarketScanError, diagnose_connection, completed_dates
+from market_scanner import run_market_scan, MarketScanError, diagnose_connection, completed_dates, diagnostic_dates, diagnose_bounded
 from scan_freshness import assess_scan_sessions
 from public_market_data import FSCStockClient
 from recommendation_backtest import run_screen_history
@@ -2568,8 +2568,10 @@ def recommendations_cancel(request: Request, body: dict):
         return JSONResponse(_scan_snapshot(profile),headers={'Cache-Control':'no-store'})
 
 
+KRX_DIAG_LOCK=threading.Lock()
+
 @app.post('/api/recommendations/diagnose')
-def recommendations_diagnose(request: Request):
+def recommendations_diagnose(request: Request, basis_date: str | None = None):
     """Auth-protected, user-triggered KRX production connection check.
 
     No raw keys, headers, provider response, or arbitrary URLs disclosed.
@@ -2581,9 +2583,17 @@ def recommendations_diagnose(request: Request):
         return JSONResponse({'configured':False,'date':None,'results':[],
             'notes':'Render 환경변수 KRX_API_KEY가 설정되지 않았습니다.'},
             headers={'Cache-Control':'no-store'})
-    date=next(completed_dates(datetime.now(KST)))
-    details=diagnose_connection(key,date,['kospi','kosdaq'])
-    return JSONResponse(details,headers={'Cache-Control':'no-store'})
+    try:
+        dates=diagnostic_dates(datetime.now(KST),basis_date)
+    except ValueError:
+        raise HTTPException(400,'2010-01-04 이후 완료된 평일을 선택하세요. 휴장일에는 데이터가 없을 수 있습니다.') from None
+    if not KRX_DIAG_LOCK.acquire(blocking=False):
+        raise HTTPException(409,'KRX 연결 진단이 이미 진행 중입니다.')
+    try:
+        details=diagnose_bounded(key,dates,probe=diagnose_connection)
+        return JSONResponse(details,headers={'Cache-Control':'no-store'})
+    finally:
+        KRX_DIAG_LOCK.release()
 
 
 # v4.4 historical baseline: authenticate, run a bounded weekly FSC screen

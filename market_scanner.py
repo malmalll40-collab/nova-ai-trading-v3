@@ -621,6 +621,53 @@ def classify_krx_response(http_status: int, payload, market: str):
             'record_count':count if state in ('success','no_data') else None}
 
 
+def diagnostic_dates(now: datetime, basis_date=None):
+    """Manual date: one completed weekday. Auto: latest and one earlier
+    weekday. These are candidates, not a verified holiday/publication calendar.
+    """
+    candidates=tuple(completed_dates(now))
+    if not candidates:raise ValueError('KRX_NO_COMPLETED_DATE')
+    if basis_date is None or basis_date=='':
+        return candidates[:2]
+    if not isinstance(basis_date,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',basis_date):
+        raise ValueError('KRX_INVALID_DATE')
+    try:day=datetime.strptime(basis_date,'%Y-%m-%d').date()
+    except ValueError:raise ValueError('KRX_INVALID_DATE') from None
+    stamp=day.strftime('%Y%m%d')
+    if day.weekday()>=5 or not '20100104'<=stamp<=candidates[0]:
+        raise ValueError('KRX_INVALID_DATE')
+    return (stamp,)
+
+
+def diagnose_bounded(api_key,dates,*,probe=None):
+    """At most two dates / four requests; only an explicit empty result may
+    qualify for an earlier date. No automatic retry on access/transport or
+    rate-limit errors. A successful market is never requested a second time.
+    No raw provider data is returned or stored.
+    """
+    if probe is None:probe=diagnose_connection
+    dates=tuple(dates)
+    if not 1<=len(dates)<=2 or len(set(dates))!=len(dates):
+        raise ValueError('KRX_INVALID_DIAGNOSTIC_WINDOW')
+    remaining=['kospi','kosdaq'];all_results=[];checked=[];notes=''
+    for day in dates:
+        if not remaining:break
+        result=probe(api_key,day,remaining)
+        if not result.get('configured'):
+            return {'configured':False,'date':dates[0],'checked_dates':[],'results':[],
+                    'notes':'KRX 인증키 미설정'}
+        rows=result.get('results',[])
+        checked.append(day)
+        all_results.extend({**r,'date':day} for r in rows)
+        notes=result.get('notes','')
+        if (len(rows)!=len(remaining) or set(r.get('market') for r in rows)!=set(remaining)
+            or any(r.get('state') not in ('success','no_data') for r in rows)):
+            break
+        remaining=[m for m in remaining if any(r.get('market')==m and r.get('state')=='no_data' for r in rows)]
+    return {'configured':True,'date':dates[0],'checked_dates':checked,'results':all_results,
+            'notes':notes}
+
+
 def diagnose_connection(api_key: str, date: str, markets: list[str], session=None):
     """Probe exact production endpoints with the same header as scanner.
 
@@ -636,7 +683,7 @@ def diagnose_connection(api_key: str, date: str, markets: list[str], session=Non
         if market not in URLS: raise ValueError('bad market')
         try:
             response=client_session.get(URLS[market],params={'basDd':date},
-                headers={'AUTH_KEY':api_key.strip(),'Accept':'application/json'},timeout=(5,14))
+                headers={'AUTH_KEY':api_key.strip(),'Accept':'application/json'},timeout=(5,14),allow_redirects=False)
             try: payload=response.json() if callable(getattr(response,'json',None)) else None
             except (ValueError,TypeError): payload=None
             results.append(classify_krx_response(response.status_code,payload,market))

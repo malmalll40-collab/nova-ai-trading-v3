@@ -21,7 +21,7 @@ class FakeSession:
     def __init__(self,responses):
         self.responses=list(responses)
         self.calls=[]
-    def get(self,url,*,params,headers,timeout):
+    def get(self,url,*,params,headers,timeout,allow_redirects=None):
         self.calls.append((url,params,headers,timeout))
         assert url in ms.URLS.values() and '/sample/' not in url
         assert params == {'basDd':'20261109'}
@@ -138,3 +138,79 @@ def test_mobile_ui_diagnostic_button_is_read_only_and_safe():
     assert '/api/recommendations/diagnose' in j
     assert 'itemNode.textContent' in j and 'out.append(itemNode)' in j
     assert server.app.openapi_url is None
+
+
+def test_manual_date_and_automatic_previous_weekday():
+    now=datetime(2026,11,27,7,50,tzinfo=ms.KST)
+    assert ms.diagnostic_dates(now)==('20261126','20261125')
+    assert ms.diagnostic_dates(now,'2026-11-20')==('20261120',)
+
+def test_manual_date_rejects_future_weekend_invalid_and_unsupported():
+    now=datetime(2026,11,27,7,50,tzinfo=ms.KST)
+    for day in ('2026-11-27','2026-11-22','2026-02-30','2009-12-31','20261125'):
+        with pytest.raises(ValueError):ms.diagnostic_dates(now,day)
+
+def test_bounded_probe_only_retries_empty_market():
+    calls=[]
+    def probe(key,day,markets):
+        calls.append((day,list(markets)))
+        rows=[{'market':m,'state':'no_data' if day=='20261126' and m=='kosdaq' else 'success'} for m in markets]
+        return {'configured':True,'results':rows}
+    result=ms.diagnose_bounded('fixture',('20261126','20261125'),probe=probe)
+    assert calls==[('20261126',['kospi','kosdaq']),('20261125',['kosdaq'])]
+    assert [r['date'] for r in result['results']]==['20261126','20261126','20261125']
+    assert result['checked_dates']==['20261126','20261125']
+
+def test_bounded_probe_stops_on_error_or_malformed_result():
+    for state in ('auth_denied','network_error','rate_limited','provider_error'):
+        calls=[]
+        def probe(key,day,markets):
+            calls.append(day)
+            return {'configured':True,'results':[{'market':'kospi','state':state},{'market':'kosdaq','state':'no_data'}]}
+        r=ms.diagnose_bounded('fixture',('20261126','20261125'),probe=probe)
+        assert calls==['20261126'] and len(r['results'])==2
+
+def test_bounded_probe_manual_single_date_and_maximum_calls():
+    calls=[]
+    def probe(key,day,markets):
+        calls.extend((day,m) for m in markets)
+        return {'configured':True,'results':[{'market':m,'state':'no_data'} for m in markets]}
+    assert ms.diagnose_bounded('fixture',('20261120',),probe=probe)['checked_dates']==['20261120']
+    assert len(calls)==2
+    calls.clear()
+    ms.diagnose_bounded('fixture',('20261126','20261125'),probe=probe)
+    assert len(calls)==4
+    with pytest.raises(ValueError):ms.diagnose_bounded('fixture',('20261126','20261125','20261124'),probe=probe)
+    assert len(calls)==4
+
+def test_explicit_date_route_and_invalid_date_do_not_reach_provider(monkeypatch):
+    c=TestClient(server.app);server.RATE.clear()
+    monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
+    monkeypatch.setenv('KRX_API_KEY','private-test-secret-krx-key')
+    calls=[]
+    def probe(key,day,markets):
+        calls.append((day,markets))
+        return {'configured':True,'results':[{'market':m,'state':'no_data'} for m in markets]}
+    monkeypatch.setattr(server,'diagnose_connection',probe)
+    r=c.post('/api/recommendations/diagnose?basis_date=2026-11-20')
+    assert r.status_code==200 and r.json()['checked_dates']==['20261120']
+    assert calls==[('20261120',['kospi','kosdaq'])]
+    assert c.post('/api/recommendations/diagnose?basis_date=not-a-date').status_code==400
+    assert len(calls)==1
+
+def test_route_busy_guard_and_release(monkeypatch):
+    c=TestClient(server.app);server.RATE.clear()
+    monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
+    monkeypatch.setenv('KRX_API_KEY','private-test-secret-krx-key')
+    monkeypatch.setattr(server,'diagnose_connection',lambda *a:pytest.fail('must not dispatch'))
+    assert server.KRX_DIAG_LOCK.acquire(False)
+    try:assert c.post('/api/recommendations/diagnose').status_code==409
+    finally:server.KRX_DIAG_LOCK.release()
+    assert not server.KRX_DIAG_LOCK.locked()
+
+def test_date_ui_has_explicit_empty_result_and_date_labels():
+    h=(server.ASSETS/'index.html').read_text(encoding='utf8')
+    j=(server.ASSETS/'recommendations.js').read_text(encoding='utf8')
+    assert 'type="date" id="recommendDiagnoseDate"' in h
+    assert '?basis_date='+'' in j and 'encodeURIComponent(date)' in j
+    assert 'item.date||d.date' in j and '빈 응답' in j
