@@ -157,7 +157,8 @@ def run(dsn,*,collection=None,allow_collection=False,calendar=session_dates,read
 
 
 def run_bounded(pooled_dsn,*,kis,telemetry,coordinator,session_mode_confirmed,
-                now,calendar,allow_collection=False,historical_calendar=session_dates):
+                now,calendar,allow_collection=False,historical_calendar=session_dates,
+                max_calls=None,max_seconds=None):
     """Wire explicit collection to the existing quota and run-lock admission.
     No production caller is installed. A successful standalone DB probe is
     not a session-mode authorization. Missing configuration stays blocked.
@@ -170,8 +171,9 @@ def run_bounded(pooled_dsn,*,kis,telemetry,coordinator,session_mode_confirmed,
             return {'status':'BLOCKED','reason':'DIRECT_CANDIDATE_UNAVAILABLE','new_rows':0}
         if getattr(telemetry,'_shared_gate',None) is None:
             return {'status':'BLOCKED','reason':'SHARED_GATE_NOT_INSTALLED','new_rows':0}
+        limits={k:v for k,v in [('max_calls',max_calls),('max_seconds',max_seconds)] if v is not None}
         return execute(dsn,kis=kis,telemetry=telemetry,coordinator=coordinator,
             session_mode_confirmed=session_mode_confirmed,now=now,calendar=calendar,
-            historical_calendar=historical_calendar)
+            historical_calendar=historical_calendar,**limits)
     return run(pooled_dsn,collection=collect,allow_collection=allow_collection,
                calendar=historical_calendar)

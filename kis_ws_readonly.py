@@ -57,7 +57,7 @@ def _approval_key() -> str:
             r=requests.post('https://openapi.koreainvestment.com:9443/oauth2/Approval',
                             json={'grant_type':'client_credentials',
                                   'appkey':os.environ['KIS_APP_KEY'],
-                                  'secretkey':os.environ['KIS_APP_SECRET']},timeout=12)
+                                  'secretkey':os.environ['KIS_APP_SECRET']},timeout=12,**KIS_LOAD.transport_options())
             r.raise_for_status()
             key=r.json().get('approval_key')
             if not isinstance(key,str) or len(key)<15:raise RuntimeError('KIS_APPROVAL_UNAVAILABLE')

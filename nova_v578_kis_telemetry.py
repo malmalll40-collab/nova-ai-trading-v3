@@ -47,6 +47,10 @@ class LocalTelemetry:
                 raise RuntimeError('SHARED_GATE_INSTALL_UNSAFE')
             self._shared_gate=gate
 
+    def transport_options(self):
+        # Redirects can create additional unreserved physical HTTP requests.
+        return {'allow_redirects':False} if self._shared_gate is not None else {}
+
     def _shared_slot(self,kind):
         # No production installation. The same gate must cover every physical
         # consumer before any account-wide evidence can be trusted.

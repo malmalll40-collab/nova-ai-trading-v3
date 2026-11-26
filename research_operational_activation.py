@@ -39,12 +39,10 @@ def summarize(r):
     if e:
         out['evaluation_status']=e.get('status')
         out['signal_dates']=e.get('signal_dates');out['opportunities']=e.get('opportunities')
-        out['strategies']=e.get('strategies')
-        out['by_market']=e.get('by_market')
-        out['by_regime']=e.get('by_regime')
-        out['frozen_holdout']=e.get('policy',{}).get('frozen_holdout')
-        ml=e.get('ml',{})
-        out['ml']={'status':ml.get('status'),'cohorts':{k:{x:v.get(x) for x in ('overall','by_market','by_regime')} for k,v in ml.get('cohorts',{}).items()}}
+        out['core']=e.get('strategies',{}).get('core')
+        h=e.get('policy',{}).get('frozen_holdout',{})
+        out['frozen_holdout']={k:h.get(k) for k in ('status','start','end','signal_dates','training_rows','model_updates_in_holdout','overall')}
+        out['ml_status']=e.get('ml',{}).get('status')
     return out
 
 def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runner=None,session_probe=None,emit=None):
@@ -58,7 +56,9 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
     def available():
         try:return not stop.is_set() and eligible(snapshot())
         except Exception:return False
-    if wait(DRAIN_SECONDS) or not available():
+    if wait(DRAIN_SECONDS):
+        return
+    if not available():
         emit('research_collection_stop',{'reason':'DRAIN_OR_WINDOW_BUSY','orders_enabled':False})
         return
     p=session_probe(dsn)
@@ -76,13 +76,27 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
         return
     coordinator=SimpleNamespace(available=available,reserve=gate.reserve)
     try:
+        if wait(2):return  # allow any completed token request's quota buffer to expire
         for i in range(MAX_PASSES):
-            if not available():break
+            if not available():
+                emit('research_collection_stop',{'reason':'FOREGROUND_OR_WINDOW_BUSY','orders_enabled':False})
+                break
+            limits={'max_calls':4,'max_seconds':45} if i==0 else {}
             r=runner(dsn,kis=kis,telemetry=KIS_LOAD,coordinator=coordinator,
                      session_mode_confirmed=True,now=lambda:datetime.now(KST),
-                     calendar=calendar,allow_collection=True)
+                     calendar=calendar,allow_collection=True,**limits)
             out=summarize(r);emit('research_collection_pass',{'pass':i+1,**out})
-            if out['status'] in ('RESEARCH_COMPLETE','INSUFFICIENT_EVIDENCE') or out['new_rows']<=0:
+            evaluation=r.get('evaluation',{})
+            if evaluation:
+                for k,metrics in evaluation.get('strategies',{}).items():
+                    emit('research_strategy_result',{'strategy':k,'metrics':metrics,'research_only':True})
+                for group in ('by_market','by_regime'):
+                    for k,metrics in evaluation.get(group,{}).items():
+                        emit('research_regime_result',{'group':group,'regime':k,'metrics':metrics,'research_only':True})
+                for k,metrics in evaluation.get('ml',{}).get('cohorts',{}).items():
+                    emit('research_ml_result',{'cohort':k,'overall':metrics.get('overall'),'research_only':True})
+            full=out['expected_rows'] is not None and out['stored_rows']==out['expected_rows']
+            if full or out['status'] in ('RESEARCH_COMPLETE','INSUFFICIENT_EVIDENCE') or out['new_rows']<=0:
                 break
             if wait(5):break
     except Exception:

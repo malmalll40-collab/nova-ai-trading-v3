@@ -14,7 +14,8 @@ class Clock:
     def sleep(self,n):self.t+=n
 class Transport:
     def __init__(self):self.calls=[]
-    def get(self,url,headers,params,timeout):
+    def get(self,url,headers,params,timeout,allow_redirects):
+        assert allow_redirects is False
         self.calls.append(params['FID_INPUT_ISCD'])
         cursor=datetime.strptime(params['FID_INPUT_DATE_2'],'%Y%m%d').date()
         rows=[d for d in DATES if d<=cursor]

@@ -102,6 +102,20 @@ def append(cur,kind,dataset,symbol,records):
                 raise ValueError('HISTORY_REVISION_CONFLICT')
         else:
             pending.append((dataset,symbol,d.isoformat(),raw,digest(raw)))
+    # PostgreSQL latency dominates row-by-row checkpoint writes on Render.
+    # Validate the complete pending set first, then insert and verify in two
+    # round trips in the existing lock-owner transaction. No UPDATE permitted.
+    if kind=='postgresql' and pending:
+        values=','.join(['(%s,%s,%s,%s,%s)']*len(pending))
+        cur.execute(f'INSERT INTO {TABLE}(dataset,symbol,day,payload,digest) VALUES {values} ON CONFLICT(dataset,symbol,day) DO NOTHING RETURNING day',
+                    tuple(x for row in pending for x in row))
+        inserted=len(cur.fetchall())
+        expected={row[2]:row[3:] for row in pending}
+        cur.execute(f'SELECT day,payload,digest FROM {TABLE} WHERE dataset=%s AND symbol=%s AND day=ANY(%s)',
+                    (dataset,symbol,list(expected)))
+        if {d:(p,h) for d,p,h in cur.fetchall()}!=expected:
+            raise ValueError('HISTORY_REVISION_CONFLICT')
+        return inserted
     inserted=0
     for args in pending:
         execute(cur,kind,f'INSERT INTO {TABLE}(dataset,symbol,day,payload,digest) VALUES(?,?,?,?,?) ON CONFLICT(dataset,symbol,day) DO NOTHING',args)
