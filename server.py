@@ -99,6 +99,8 @@ SCAN_LOCK = threading.RLock()
 SCAN_STATE = {'status':'idle','progress':{},'result':None,'error':None,'started_monotonic':None,'market':'all'}
 SCAN_JOB = None
 SCAN_CANCEL = threading.Event()
+SCAN_PROFILES = {'full': SCAN_STATE, 'pattern': dict(SCAN_STATE)}
+SCAN_ACTIVE = ('running','cancelling','finalizing')
 BACKTEST_LOCK = threading.RLock()
 BACKTEST_STATE = {'status':'idle','result':None,'error':None,'progress':{},'market':'all','weeks':4}
 BACKTEST_JOB = None
@@ -1600,9 +1602,10 @@ if __name__=='__main__':
 
 
 # v4.2 — Market-wide EOD recommendation screener. No automated orders.
-def _scan_snapshot():
+def _scan_snapshot(profile='full'):
     with SCAN_LOCK:
-        state=dict(SCAN_STATE)
+        state=dict(SCAN_PROFILES[profile])
+        state['active_profile']=next((p for p,v in SCAN_PROFILES.items() if v.get('status') in SCAN_ACTIVE),None)
     state.pop('started_monotonic', None)
     state['krx_configured']=bool(os.environ.get('KRX_API_KEY','').strip())
     state['fsc_configured']=bool(os.environ.get('FSC_STOCK_API_KEY','').strip())
@@ -1624,14 +1627,15 @@ def _cached_research_flow(symbol: str) -> dict | None:
 
 
 def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: int=48, profile: str='full'):
+    state=SCAN_PROFILES[profile]
     started=time.monotonic()
     def checkpoint():
         if SCAN_CANCEL.is_set():
             raise MarketScanError('cancelled','사용자가 검색을 취소했습니다.')
     def progress(p):
         with SCAN_LOCK:
-            if SCAN_STATE.get('job_id')==job_id:
-                SCAN_STATE['progress']=p
+            if state.get('job_id')==job_id:
+                state['progress']=p
     try:
         client = FSCStockClient(api_key) if provider == 'fsc' else None
         result=run_market_scan(market=market,api_key=api_key,client=client,
@@ -1646,7 +1650,7 @@ def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: i
         # changing existing recommendation decisions or screen response timing.
         with SCAN_LOCK:
             checkpoint()
-            SCAN_STATE['status']='finalizing'
+            state['status']='finalizing'
         if profile=='full' and evidence_backend() != 'disabled':
             try:
                 contexts=capture_market_context()
@@ -1656,20 +1660,20 @@ def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: i
         result['elapsed_seconds']=round(time.monotonic()-started,2)
         logging.getLogger('nova.scan').info('NOVA_SCAN profile=%s elapsed_seconds=%.2f deep_target=%s deep_failed=%s',profile,result['elapsed_seconds'],result.get('deep_target'),result.get('deep_failed'))
         with SCAN_LOCK:
-            if SCAN_STATE.get('job_id')==job_id:
-                SCAN_STATE.update(status='complete',result=result,error=None,
+            if state.get('job_id')==job_id:
+                state.update(status='complete',result=result,error=None,
                    completed_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),
                    completed_monotonic=time.monotonic())
     except MarketScanError as err:
         with SCAN_LOCK:
-            if SCAN_STATE.get('job_id')==job_id:
-                SCAN_STATE.update(status='cancelled' if err.code=='cancelled' else 'failed',result=None,
+            if state.get('job_id')==job_id:
+                state.update(status='cancelled' if err.code=='cancelled' else 'failed',result=None,
                   error={'code':err.code,'message':str(err)},
                   completed_at=datetime.now(timezone.utc).isoformat(timespec='seconds'))
     except Exception:
         with SCAN_LOCK:
-            if SCAN_STATE.get('job_id')==job_id:
-                SCAN_STATE.update(status='failed',result=None,
+            if state.get('job_id')==job_id:
+                state.update(status='failed',result=None,
                   error={'code':'internal','message':'시장 검색에 실패했습니다. 서버 로그와 시세 공급원을 확인하세요.'},
                   completed_at=datetime.now(timezone.utc).isoformat(timespec='seconds'))
 
@@ -2346,10 +2350,11 @@ def popular_run(request: Request, body: dict):
 
 
 @app.get('/api/recommendations/status')
-def recommendations_status(request: Request):
+def recommendations_status(request: Request, profile: str='full'):
     _authorize(request)
     _limit(request)
-    return JSONResponse(_scan_snapshot(),headers={'Cache-Control':'no-store'})
+    if profile not in SCAN_PROFILES: raise HTTPException(422,'잘못된 검색 유형')
+    return JSONResponse(_scan_snapshot(profile),headers={'Cache-Control':'no-store'})
 
 
 @app.post('/api/recommendations/run')
@@ -2382,43 +2387,48 @@ def recommendations_run(request: Request, body: dict):
         if BACKTEST_STATE.get('status') == 'running':
             raise HTTPException(409,'과거 검증이 진행 중입니다. 종료 후 전체 시장 검색을 실행하세요.')
     global SCAN_JOB
+    state=SCAN_PROFILES[profile]
     with SCAN_LOCK:
-        current=SCAN_STATE.get('status')
-        if current in ('running','cancelling','finalizing'):
-            return JSONResponse(dict(_scan_snapshot(),notice='이미 시장 검색이 진행 중입니다.'),
+        current=state.get('status')
+        if any(v.get('status') in SCAN_ACTIVE for v in SCAN_PROFILES.values()):
+            if current not in SCAN_ACTIVE: raise HTTPException(409,'다른 검색이 진행 중입니다.')
+            return JSONResponse(dict(_scan_snapshot(profile),notice='이미 시장 검색이 진행 중입니다.'),
                                 headers={'Cache-Control':'no-store'})
-        if (current=='complete' and SCAN_STATE.get('market')==market and SCAN_STATE.get('source')==provider and
-            SCAN_STATE.get('depth')==depth and SCAN_STATE.get('scan_profile','full')==profile and
-            SCAN_STATE.get('completed_monotonic') and
-            time.monotonic()-SCAN_STATE['completed_monotonic']<20*60):
-            return JSONResponse(dict(_scan_snapshot(),notice='20분 이내 완료한 검색 결과를 재사용합니다.'),
+        if (current=='complete' and state.get('market')==market and state.get('source')==provider and
+            state.get('depth')==depth and state.get('scan_profile','full')==profile and
+            state.get('completed_monotonic') and
+            time.monotonic()-state['completed_monotonic']<20*60):
+            return JSONResponse(dict(_scan_snapshot(profile),notice='20분 이내 완료한 검색 결과를 재사용합니다.'),
                                 headers={'Cache-Control':'no-store'})
         job_id=secrets.token_hex(8)
         SCAN_CANCEL.clear()
-        SCAN_STATE.clear()
+        state.clear()
         label='금융위원회 T+1' if provider=='fsc' else 'KRX 장 마감'
-        SCAN_STATE.update(status='running',market=market,source=provider,depth=depth,job_id=job_id,scan_profile=profile,
+        state.update(status='running',market=market,source=provider,depth=depth,job_id=job_id,scan_profile=profile,
             progress={'phase':'provider','done':0,'total':None,'message':f'{label} 일별 시장자료 확인 중'},
             result=None,error=None,started_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),
             started_monotonic=time.monotonic())
         SCAN_JOB=threading.Thread(target=_scan_worker,args=(market,job_id,provider,key,depth,profile),daemon=True,
                                    name='nova-market-eod-scan')
         SCAN_JOB.start()
-    return JSONResponse(_scan_snapshot(),headers={'Cache-Control':'no-store'})
+    return JSONResponse(_scan_snapshot(profile),headers={'Cache-Control':'no-store'})
 
 
 @app.post('/api/recommendations/cancel')
 def recommendations_cancel(request: Request, body: dict):
     _authorize(request)
     _limit(request)
+    profile=body.get('profile','full')
+    if profile not in SCAN_PROFILES: raise HTTPException(422,'잘못된 검색 유형')
+    state=SCAN_PROFILES[profile]
     with SCAN_LOCK:
-        if body.get('job_id') != SCAN_STATE.get('job_id') or not body.get('job_id'):
+        if body.get('job_id') != state.get('job_id') or not body.get('job_id'):
             raise HTTPException(409,'현재 검색 작업과 일치하지 않습니다.')
-        if SCAN_STATE.get('status') not in ('running','cancelling'):
+        if state.get('status') not in ('running','cancelling'):
             raise HTTPException(409,'취소 가능한 검색이 없습니다.')
         SCAN_CANCEL.set()
-        SCAN_STATE['status']='cancelling'
-        return JSONResponse(_scan_snapshot(),headers={'Cache-Control':'no-store'})
+        state['status']='cancelling'
+        return JSONResponse(_scan_snapshot(profile),headers={'Cache-Control':'no-store'})
 
 
 @app.post('/api/recommendations/diagnose')
@@ -2501,7 +2511,7 @@ def recommendation_backtest_run(request: Request, body: dict):
         raise HTTPException(503, {'code':'fsc_not_configured',
               'message':'Render에 FSC_STOCK_API_KEY를 먼저 설정하세요.'})
     with SCAN_LOCK:
-        if SCAN_STATE.get('status') in ('running','cancelling','finalizing'):
+        if any(v.get('status') in SCAN_ACTIVE for v in SCAN_PROFILES.values()):
             raise HTTPException(409,'현재 종목추천 검색 중입니다. 검색이 종료된 후 백테스트를 실행하세요.')
     global BACKTEST_JOB
     with BACKTEST_LOCK:
