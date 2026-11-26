@@ -53,3 +53,23 @@ test('complete result renders in dedicated menu and reset clears it',async()=>{
   assert.equal(h.el('patternResults').children.length,0);
   assert.ok(h.el('patternStatus').textContent.includes('검색 실패'));
 });
+
+test('two buttons request distinct profiles with same shared scan lock',async()=>{
+  for(const [id,profile] of [['recommendScan','full'],['patternScan','pattern']]){
+    const h=harness();
+    h.setResponse({status:'running',progress:{phase:'deep',done:1,total:48}});
+    await h.el(id).onclick();
+    const req=h.requests.find(x=>x.url==='/api/recommendations/run');
+    assert.equal(JSON.parse(req.options.body).profile,profile);
+  }
+});
+test('pattern-only completion does not claim zero strict candidates',async()=>{
+  const h=harness();
+  h.setResponse({status:'complete',fsc_configured:true,source:'fsc',depth:48,market:'all',job_id:'p',result:{data_date:'20261125',scan_profile:'pattern',signal_pattern_research:{eligible_total:2},elapsed_seconds:12}});
+  await h.window.NOVAScanner.load();
+  assert.equal(h.el('patternResults').children.length,1);
+  assert.equal(h.el('recommendNumbers').hidden,true);
+  assert.ok(h.el('patternStatus').textContent.includes('신호패턴 전용'));
+  assert.ok(h.el('patternStatus').textContent.includes('12초'));
+  assert.ok(!h.el('patternStatus').textContent.includes('엄격 매수 0'));
+});
