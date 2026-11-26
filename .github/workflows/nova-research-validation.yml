@@ -25,7 +25,7 @@ jobs:
       - name: Compile sources
         run: python -m compileall -q -x '/\.git/' .
       - name: Focused research tests
-        run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py
+        run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py tests/test_v579_admission.py
       - name: Regression tests
         run: |
           python -m pytest --collect-only -q > /tmp/nova-test-collection.txt
@@ -37,9 +37,9 @@ jobs:
           import xml.etree.ElementTree as ET
           root = ET.parse('/tmp/nova-regression.xml').getroot()
           cases = list(root.iter('testcase'))
-          assert len(cases) == 823, f'Expected 823 cases, got {len(cases)}'
+          assert len(cases) == 834, f'Expected 834 cases, got {len(cases)}'
           assert not any(c.find(k) is not None for c in cases for k in ('failure','error','skipped'))
-          print('All 823 regression cases passed without skips')
+          print('All 834 regression cases passed without skips')
           PY
       - name: Verify Render archive overlay
         if: always()
@@ -51,7 +51,7 @@ jobs:
           print('Root archive count:', len(archives))
           assert len(archives) == 1, 'Render extraction requires exactly one root ZIP'
           tracked = set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))
-          required = {'server.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py'}
+          required = {'server.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py'}
           assert required <= tracked, 'Required research source not tracked'
           with zipfile.ZipFile(archives[0]) as z:
               names = set()

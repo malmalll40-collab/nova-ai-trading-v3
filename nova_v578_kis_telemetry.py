@@ -18,6 +18,8 @@ class LocalTelemetry:
         self._attempts=deque();self._errors=deque()
         self._overflow_until=0.0
         self._total=0;self._retry_total=0;self._token_total=0
+        self._research_active=0;self._research_total=0
+        self._research_attempts=deque()
 
     def _prune(self,q,now):
         while q and q[0]<=now-WINDOW:q.popleft()
@@ -50,6 +52,33 @@ class LocalTelemetry:
         finally:
             with self._lock:self._physical_active-=1
 
+    @contextmanager
+    def research_attempt(self,proof):
+        """Atomic local admission; foreground never waits for research.
+        Proof must come from a trusted account-wide coordinator (not installed).
+        This is a per-attempt gate, not a reservation of global provider quota.
+        """
+        from nova_v579_admission import admission_reason, ResearchBlocked
+        with self._lock:
+            now=self._clock()
+            self._prune(self._attempts,now);self._prune(self._errors,now)
+            self._prune(self._research_attempts,now)
+            reason=admission_reason(proof,self._wall(),foreground=self._active,
+                physical=self._physical_active,research=self._research_active,
+                errors=len(self._errors),overflow=now<self._overflow_until,
+                starts=tuple(self._research_attempts),monotonic_now=now)
+            if reason:raise ResearchBlocked(reason)
+            self._research_active+=1;self._physical_active+=1
+            self._total+=1;self._research_total+=1
+            self._append(self._attempts,now);self._append(self._research_attempts,now)
+        try:yield
+        except Exception:
+            self.failure()
+            raise
+        finally:
+            with self._lock:
+                self._physical_active-=1;self._research_active-=1
+
     def failure(self):
         with self._lock:self._append(self._errors,self._clock())
 
@@ -63,6 +92,7 @@ class LocalTelemetry:
                 'recent_provider_errors':len(self._errors),
                 'physical_attempts_total':self._total,'retries_total':self._retry_total,
                 'token_attempts_total':self._token_total,'window_overflow':now<self._overflow_until,
+                'research_active':self._research_active,'research_attempts_total':self._research_total,
                 # No account entitlement, multi-process or other client visibility.
                 # Never substitute local counts for global available quota.
                 'verified':False,'physical_headroom':0,'foreground_waiting':0,
