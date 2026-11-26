@@ -85,6 +85,13 @@ async def _app_lifespan(application):
         except Exception:
             from ops_diagnostics import emit
             emit('research_activation',{'status':'BLOCKED','reason':'STARTUP_FAILED','orders_enabled':False})
+    if os.getenv('NOVA_KRX_ACCESS_PROBE')=='2026-11-25-stock-only-v1':
+        try:
+            from research_krx_access_probe import start_if_enabled
+            start_if_enabled(stop_preflight,_ops_preflight_snapshot)
+        except Exception:
+            from ops_diagnostics import emit
+            emit('krx_access_probe_stop',{'reason':'STARTUP_FAILED','orders_enabled':False,'stored_rows':0})
     try:
         threading.Thread(target=_ops_preflight_loop,args=(stop_preflight,),daemon=True,name='nova-ops-preflight').start()
     except Exception:
