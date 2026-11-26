@@ -9,11 +9,14 @@ from urllib.parse import urlsplit
 from research_history_checkpoint import TABLE, DATASETS, manifest, saved
 from nova_v576_expanded_coverage import SYMBOLS
 from nova_v574_data_audit import INDEX_CODES
+from research_db_endpoint import endpoint_kind
 
 LOCK_KEY=601_576_001
 
 @contextmanager
 def exclusive_run(dsn, *, session_mode_confirmed=False, connect=None):
+    if endpoint_kind(dsn)=='NEON_TRANSACTION_POOLER':
+        raise ValueError('TRANSACTION_POOLER_UNSUPPORTED')
     if session_mode_confirmed is not True:
         raise ValueError('SESSION_MODE_UNVERIFIED')
     if not isinstance(dsn,str) or urlsplit(dsn).scheme not in ('postgres','postgresql'):
