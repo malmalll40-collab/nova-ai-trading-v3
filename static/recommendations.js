@@ -226,7 +226,7 @@
     for(const p of ['full','pattern']){
       const pre=prefix(p);
       const btn=$(pre+'Cancel');if(btn)btn.onclick=()=>cancel(p);
-      for(const key of ['Source','Depth','Market'])if($(pre+key))$(pre+key).onchange=()=>{if(p==='full'){$('recommendResults')?.replaceChildren();if($('recommendNumbers'))$('recommendNumbers').hidden=true;}else $('patternResults')?.replaceChildren();fetchState();};
+      for(const key of ['Source','Depth','Market'])if($(pre+key))$(pre+key).onchange=()=>{if(p==='full'){$('recommendResults')?.replaceChildren();if($('recommendNumbers'))$('recommendNumbers').hidden=true;}else $('patternResults')?.replaceChildren();return fetchState();};
     }
     document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPoll();else if(viewOpen())fetchState();});
   }
