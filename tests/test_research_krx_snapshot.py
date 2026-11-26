@@ -81,3 +81,15 @@ def test_corrupt_snapshot_not_counted(db):
     import_snapshot(cur,'sqlite',ds,'kospi_dd_trd',DAY,payload('kospi_dd_trd'),authorized=lambda s,d:True)
     cur.execute(f'UPDATE {TABLE} SET digest=? WHERE dataset=?',('bad',ds))
     with pytest.raises(ValueError,match='KRX_SNAPSHOT_CORRUPT'):coverage(cur,'sqlite',ds)
+
+def test_noncanonical_duplicate_day_not_counted(db):
+    cur,ds=db
+    import_snapshot(cur,'sqlite',ds,'kospi_dd_trd',DAY,payload('kospi_dd_trd'),authorized=lambda s,d:True)
+    cur.execute(f"INSERT INTO {TABLE}(dataset,service,day,payload,digest) SELECT dataset,service,'20261125',payload,digest FROM {TABLE} WHERE dataset=?",(ds,))
+    with pytest.raises(ValueError,match='KRX_SNAPSHOT_CORRUPT'):coverage(cur,'sqlite',ds)
+
+def test_initialize_accepts_single_pass_calendar():
+    with sqlite3.connect(':memory:') as conn:
+        cur=conn.cursor()
+        ds=initialize(cur,'sqlite',iter(DAYS))
+        assert ds==manifest(DAYS)[0] and coverage(cur,'sqlite',ds)['expected_rows']==22

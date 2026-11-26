@@ -131,6 +131,7 @@ def _load_manifest(cur,kind,dataset):
 
 def initialize(cur,kind,sessions):
     """Explicit caller-owned transaction only; no network or startup hook."""
+    sessions=tuple(sessions)
     dataset,raw=manifest(sessions)
     for sql in SCHEMA:execute(cur,kind,sql)
     execute(cur,kind,f'INSERT INTO {DATASETS}(id,manifest) VALUES(?,?) ON CONFLICT(id) DO NOTHING',(dataset,raw))
@@ -158,10 +159,17 @@ def coverage(cur,kind,dataset):
     """Private aggregate coverage only; verify content on every read."""
     days=set(_load_manifest(cur,kind,dataset))
     execute(cur,kind,f'SELECT service,day,payload,digest FROM {TABLE} WHERE dataset=?',(dataset,))
-    counts={s:0 for s in SERVICES}
+    counts={s:0 for s in SERVICES};seen=set()
     for service,stamp,raw,checksum in cur.fetchall():
-        if service not in SERVICES or date.fromisoformat(stamp) not in days or digest(raw)!=checksum or _snapshot_raw(service,json.loads(raw))!=raw:
-            raise ValueError('KRX_SNAPSHOT_CORRUPT')
+        try:
+            d=date.fromisoformat(stamp)
+            key=(service,d)
+            valid=(service in SERVICES and d in days and stamp==d.isoformat() and key not in seen
+                   and digest(raw)==checksum and _snapshot_raw(service,json.loads(raw))==raw)
+        except (ValueError,TypeError,OverflowError,KeyError):
+            valid=False
+        if not valid:raise ValueError('KRX_SNAPSHOT_CORRUPT')
+        seen.add(key)
         counts[service]+=1
     expected=len(days)*len(SYMBOLS)
     stored=sum(counts[s]*len(SERVICES[s]) for s in counts)
