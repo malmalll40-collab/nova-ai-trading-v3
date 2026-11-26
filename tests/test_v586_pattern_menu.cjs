@@ -8,11 +8,11 @@ function harness(){
     if(!nodes.has(id))nodes.set(id,{id,hidden:false,disabled:id==='patternScan',value:id.endsWith('Depth')?'48':id.endsWith('Market')?'all':'auto',textContent:'',dataset:{},style:{},attrs:{},children:[],classList:{toggle(){}},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},replaceChildren(){this.children=[];},append(...x){this.children.push(...x);},appendChild(x){this.append(x);}});
     return nodes.get(id);
   };
-  const idle={status:'idle',fsc_configured:true};let states={full:idle,pattern:idle},networkFailure=false;
+  const idle={status:'idle',fsc_configured:true};let states={full:idle,pattern:idle},networkFailure=false,rateLimited=false,clock=100000;
   const window={addEventListener:(k,cb)=>handlers[k]=cb,NOVAConnect:{currentView:()=> 'recommendations'},NOVAPatternResearch:{render:(target,res)=>target.append(res.signal_pattern_research)}};
-  vm.runInNewContext(fs.readFileSync('static/recommendations.js','utf8'),{window,document:{getElementById:el,createElement:el,addEventListener(){},hidden:false},sessionStorage:{getItem(){return null;}},setInterval(){return 1;},clearInterval(){},fetch:async(url,options)=>{requests.push({url,options});if(networkFailure)throw Error('offline');const p=url.includes('?profile=')?url.split('=')[1]:JSON.parse(options?.body||'{}').profile||'full';return {ok:true,json:async()=>states[p]};},Intl});
+  vm.runInNewContext(fs.readFileSync('static/recommendations.js','utf8'),{window,document:{getElementById:el,createElement:el,addEventListener(){},hidden:false},sessionStorage:{getItem(){return null;}},setInterval(){return 1;},clearInterval(){},fetch:async(url,options)=>{requests.push({url,options});if(networkFailure)throw Error('offline');if(rateLimited)return {ok:false,status:429,headers:{get:()=> '20'}};if(url.includes('profile=all'))return {ok:true,json:async()=>({profiles:states})};const p=url.includes('?profile=')?url.split('=')[1]:JSON.parse(options?.body||'{}').profile||'full';return {ok:true,json:async()=>states[p]};},Intl,Date:{now:()=>clock}});
   handlers.DOMContentLoaded();
-  return {el,window,requests,setResponse:(p,x)=>states[p]=x,setNetworkFailure:x=>networkFailure=x};
+  return {el,window,requests,setResponse:(p,x)=>states[p]=x,setNetworkFailure:x=>networkFailure=x,setRateLimited:x=>rateLimited=x,advance:ms=>clock+=ms};
 }
 test('pattern controls are always visible before search and initialize without network traffic',()=>{
   const html=fs.readFileSync('static/index.html','utf8');
@@ -129,4 +129,34 @@ test('network failure clears both previous result lists and disables unsafe cont
   assert.equal(h.el('recommendScan').disabled,false);
   assert.equal(h.el('patternScan').disabled,false);
   assert.equal(h.el('patternResults').children.length,1);
+});
+
+test('one combined status poll and explicit separate work states',async()=>{
+  const h=harness();
+  h.setResponse('full',{status:'idle',fsc_configured:true,active_profile:'pattern'});
+  h.setResponse('pattern',{status:'running',active_profile:'pattern',fsc_configured:true,job_id:'p1'});
+  await h.window.NOVAScanner.load();
+  assert.equal(h.requests.filter(x=>x.url.includes('/status')).length,1);
+  assert.ok(h.requests[0].url.includes('profile=all'));
+  assert.ok(h.el('recommendStatus').textContent.includes('다른 검색이 실행 중'));
+  assert.ok(h.el('patternStatus').textContent.includes('검색 진행 중'));
+});
+test('429 respects retry interval and reconnects without starting or cancelling any scan',async()=>{
+  const h=harness();
+  h.setResponse('pattern',{status:'running',active_profile:'pattern',fsc_configured:true,job_id:'p1'});
+  await h.window.NOVAScanner.load();
+  h.setRateLimited(true);
+  await h.window.NOVAScanner.load();
+  const n=h.requests.length;
+  assert.ok(h.el('patternStatus').textContent.includes('작업 중단 여부 미확인'));
+  h.setRateLimited(false);
+  h.advance(19000);
+  await h.window.NOVAScanner.load();
+  assert.equal(h.requests.length,n);
+  h.advance(1000);
+  await h.window.NOVAScanner.load();
+  assert.equal(h.requests.length,n+1);
+  assert.ok(h.el('patternStatus').textContent.includes('검색 진행 중'));
+  assert.equal(h.el('patternCancel').disabled,false);
+  assert.ok(h.requests.every(x=>x.url.includes('/status')));
 });

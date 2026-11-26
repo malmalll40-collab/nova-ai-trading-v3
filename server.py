@@ -87,6 +87,7 @@ CACHE_LOCK = threading.Lock()
 CACHE_KEY_LOCKS = {}
 CACHE = {}
 RATE = {}
+SCAN_STATUS_RATE = {}
 CACHE_TTL = 52
 FIN_CACHE_TTL = 6 * 3600
 JOURNAL_CACHE_LOCK = threading.Lock()
@@ -215,6 +216,21 @@ def _limit(request: Request):
         RATE[ip] = ts
         if len(RATE)>500:
             RATE.clear()
+
+
+def _limit_scan_status(request: Request):
+    """Bound cheap authenticated status reads separately; never relax the data API cap."""
+    ip=request.client.host if request.client else 'unknown'
+    now=time.monotonic()
+    with CACHE_LOCK:
+        for key, stamps in list(SCAN_STATUS_RATE.items()):
+            if not stamps or now-stamps[-1]>=60:
+                SCAN_STATUS_RATE.pop(key,None)
+        ts=[x for x in SCAN_STATUS_RATE.get(ip,[]) if now-x<60]
+        if len(ts)>=12 or (ip not in SCAN_STATUS_RATE and len(SCAN_STATUS_RATE)>=500):
+            retry=max(1,math.ceil(60-(now-ts[0]))) if ts else 60
+            raise HTTPException(429,'검색 상태 조회 제한입니다. 잠시 후 다시 확인합니다.',headers={'Retry-After':str(retry)})
+        SCAN_STATUS_RATE[ip]=ts+[now]
 
 
 @contextmanager
@@ -2352,8 +2368,14 @@ def popular_run(request: Request, body: dict):
 @app.get('/api/recommendations/status')
 def recommendations_status(request: Request, profile: str='full'):
     _authorize(request)
-    _limit(request)
-    if profile not in SCAN_PROFILES: raise HTTPException(422,'잘못된 검색 유형')
+    if profile!='all' and profile not in SCAN_PROFILES:
+        raise HTTPException(422,'잘못된 검색 유형')
+    _limit_scan_status(request)
+    if profile=='all':
+        # One consistent snapshot; no market data requests, job creation or writes.
+        with SCAN_LOCK:
+            payload={'profiles':{p:_scan_snapshot(p) for p in ('full','pattern')}}
+        return JSONResponse(payload,headers={'Cache-Control':'no-store'})
     return JSONResponse(_scan_snapshot(profile),headers={'Cache-Control':'no-store'})
 
 

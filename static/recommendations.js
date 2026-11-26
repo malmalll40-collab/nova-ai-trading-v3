@@ -3,7 +3,8 @@
 (()=>{
   const $ = id=>document.getElementById(id);
   const preview=Boolean(window.NOVA_PREVIEW_DATA);
-  let timer=null, busy=false, submitting=false;
+  let timer=null, busy=false, submitting=false, retryAt=0;
+  const POLL_MS=8000;
   const viewOpen=()=>window.NOVAConnect?.currentView()==='recommendations'&&!document.hidden;
   const won=v=>v==null||!Number.isFinite(Number(v))?'미확인':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0}).format(Number(v))+'원';
   const money=v=>v==null?'—':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:1}).format(Number(v)/1e8)+'억원';
@@ -139,8 +140,9 @@
     const o=options(p),ready=o.source==='fsc'?d.fsc_configured:o.source==='krx'?d.krx_configured:d.fsc_configured||d.krx_configured;
     const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
     const msg=({cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
-    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg,progress:d.progress});status(msg);}
-    else if($('patternStatus'))$('patternStatus').textContent=active&&d.status==='running'?'검색 진행 중 · '+msg:msg;
+    const wait=other&&!active?' · 다른 검색이 실행 중입니다. 완료 후 시작할 수 있습니다.':'';
+    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg+wait,progress:d.progress});status(msg+wait);}
+    else if($('patternStatus'))$('patternStatus').textContent=(active&&d.status==='running'?'검색 진행 중 · '+msg:msg)+wait;
     const button=$(pre+'Scan');if(button)button.disabled=Boolean(submitting||active||other||!ready);
     const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=d.status!=='running'||!d.job_id;
     const target=p==='full'?'recommendResults':'patternResults';
@@ -155,22 +157,31 @@
   }
   async function fetchState(){
     if(preview){for(const p of ['full','pattern']){const b=$(prefix(p)+'Scan');if(b)b.disabled=true;const s=$(prefix(p)+'Status');if(s)s.textContent='체험판에서는 실제 검색을 실행하지 않습니다.';}return;}
-    if(busy)return;busy=true;
+    if(busy||Date.now()<retryAt)return;busy=true;
     try{
-      const states=await Promise.all(['full','pattern'].map(async p=>{
-        const r=await fetch('/api/recommendations/status?profile='+p,{headers:headers(),cache:'no-store'});
-        if(!r.ok)throw Error('검색 상태 확인 실패');return [p,await r.json()];
-      }));
+      const r=await fetch('/api/recommendations/status?profile=all',{headers:headers(),cache:'no-store'});
+      if(!r.ok){
+        if(r.status===429){
+          const seconds=Number(r.headers?.get('Retry-After'));
+          retryAt=Date.now()+1000*(Number.isFinite(seconds)&&seconds>0?Math.max(8,seconds):60);
+          throw Error('상태 조회 제한 · 검색 중단 여부 미확인, 자동 재연결');
+        }
+        throw Error('검색 상태 확인 실패');
+      }
+      const data=await r.json();
+      if(!data.profiles?.full||!data.profiles?.pattern)throw Error('검색 상태 응답 확인 실패');
+      const states=Object.entries(data.profiles).filter(([p])=>p==='full'||p==='pattern');
+      retryAt=0;
       states.forEach(([p,d])=>applyState(p,d));
       if(states.some(([,d])=>activeStates.includes(d.status)))startPoll();else stopPoll();
     }catch(e){
       $('recommendNumbers').hidden=true;
       $('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();
       jobs.full={};jobs.pattern={};
-      setSearchState('unavailable',{message:'검색 상태 확인 실패 · 연결을 확인하세요.'});
+      setSearchState('unavailable',{message:'검색 상태 확인 실패 · 작업 중단 여부 미확인 · 자동 재연결'});
       status(e.message,true);
       for(const p of ['full','pattern']){const pre=prefix(p);$(pre+'Scan').disabled=true;$(pre+'Cancel').disabled=true;}
-      if($('patternStatus'))$('patternStatus').textContent='검색 상태 확인 실패 · 연결을 확인하세요.';
+      if($('patternStatus'))$('patternStatus').textContent='검색 상태 확인 실패 · 작업 중단 여부 미확인 · 자동 재연결';
       startPoll();
     }finally{busy=false;}
   }
@@ -181,8 +192,8 @@
     try{
       const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify(options(p)),cache:'no-store'});
       const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:d.detail?.message||'검색 실패');
-      applyState(p,d);startPoll();await fetchState();
-    }catch(e){$(prefix(p)+'Status').textContent=e.message;await fetchState();}
+      applyState(p,d);startPoll();
+    }catch(e){$(prefix(p)+'Status').textContent=e.message;}
     finally{submitting=false;await fetchState();}
   }
   async function cancel(p){
@@ -217,7 +228,7 @@
     finally{btn.disabled=false;}
   }
   function stopPoll(){if(timer){clearInterval(timer);timer=null;}}
-  function startPoll(){if(timer)return;timer=setInterval(()=>{if(viewOpen())fetchState();else if(document.hidden)stopPoll();},4500);}
+  function startPoll(){if(timer)return;timer=setInterval(()=>{if(viewOpen())fetchState();else if(document.hidden)stopPoll();},POLL_MS);}
   function onViewChange(next){
     if(next!=='recommendations'){stopPoll();return;}
     fetchState();
