@@ -67,7 +67,8 @@ def test_holes_are_separate_windows(db):
     api=API()
     r=run(db,api,max_windows=2)
     assert r['new_rows']==2
-    assert [(c['FID_INPUT_DATE_1'],c['FID_INPUT_DATE_2']) for c in api.calls]==[(D[0].strftime('%Y%m%d'),)*2,(D[2].strftime('%Y%m%d'),)*2]
+    assert [(c['FID_INPUT_DATE_1'],c['FID_INPUT_DATE_2']) for c in api.calls]==[(D[0].strftime('%Y%m%d'),D[1].strftime('%Y%m%d')),(D[1].strftime('%Y%m%d'),D[2].strftime('%Y%m%d'))]
+    assert r['overlap_anchors_checked']==2
 
 def test_global_budget_enforced(db):
     api=API()
@@ -91,3 +92,37 @@ def test_block_during_run_preserves_completed_window(db):
     assert r['status']=='PARTIAL' and r['new_rows']==3 and r['logical_calls']==1
     with db() as (cur,kind):
         assert not missing_windows(cur,kind,r['dataset'],SYMBOLS[0])
+
+def test_changed_overlap_blocks_new_rows(db):
+    with db() as (cur,kind):
+        dataset=initialize(cur,kind,D)
+        append(cur,kind,dataset,SYMBOLS[0],{D[1]:{'close':99}})
+    r=run(db,API())
+    assert r['reason']=='ADJUSTED_HISTORY_OVERLAP_CONFLICT' and r['new_rows']==0
+    with db() as (cur,kind):
+        assert saved(cur,kind,dataset,SYMBOLS[0])=={D[1]:{'close':99.0}}
+
+def test_missing_overlap_blocks_new_rows(db):
+    with db() as (cur,kind):
+        dataset=initialize(cur,kind,D)
+        append(cur,kind,dataset,SYMBOLS[0],{D[1]:{'close':100}})
+    class Missing(API):
+        def get(self,*args):
+            p=super().get(*args)
+            p['output2']=[row for row in p['output2'] if row['stck_bsop_date']!='20261124']
+            return p
+    r=run(db,Missing())
+    assert r['reason']=='OVERLAP_ANCHOR_MISSING' and r['new_rows']==0
+    with db() as (cur,kind):
+        assert len(saved(cur,kind,dataset,SYMBOLS[0]))==1
+
+def test_internal_gap_checks_both_edges(db):
+    with db() as (cur,kind):
+        dataset=initialize(cur,kind,D)
+        append(cur,kind,dataset,SYMBOLS[0],{D[0]:{'close':100},D[2]:{'close':100}})
+    api=API()
+    r=run(db,api,max_windows=1)
+    assert r['new_rows']==1 and r['overlap_anchors_checked']==2
+    assert api.calls[0]['FID_INPUT_DATE_1']=='20261123'
+    assert api.calls[0]['FID_INPUT_DATE_2']=='20261125'
+    assert not r['adjustment_basis_verified_across_runs'] and not r['training_ready']

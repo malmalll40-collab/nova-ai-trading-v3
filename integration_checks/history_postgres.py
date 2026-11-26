@@ -35,7 +35,7 @@ def main():
         def __init__(self): self.calls=[]
         def get(self,path,tr,params):
             self.calls.append(params)
-            return {'output2':[{'stck_bsop_date':params['FID_INPUT_DATE_1'],'bstp_nmix_prpr':'100'}]}
+            return {'output2':[{'stck_bsop_date':d.strftime('%Y%m%d'),'bstp_nmix_prpr':'100'} for d in days if params['FID_INPUT_DATE_1']<=d.strftime('%Y%m%d')<=params['FID_INPUT_DATE_2']]}
     api=Fake()
     def run():
         return resume(api,days,transaction=tx,now=lambda:datetime(2026,11,26,21,tzinfo=KST),
@@ -45,7 +45,8 @@ def main():
     assert a['new_rows']==1 and a['logical_calls']==1
     b=run()
     assert b['new_rows']==1 and b['logical_calls']==1
-    assert [x['FID_INPUT_DATE_1'] for x in api.calls]==['20261123','20261125']
+    assert [(x['FID_INPUT_DATE_1'],x['FID_INPUT_DATE_2']) for x in api.calls]==[('20261123','20261124'),('20261124','20261125')]
+    assert a['overlap_anchors_checked']==b['overlap_anchors_checked']==1
     with tx() as (cur,kind):
         assert missing_windows(cur,kind,dataset,symbol)==[]
         assert len(saved(cur,kind,dataset,symbol))==3
