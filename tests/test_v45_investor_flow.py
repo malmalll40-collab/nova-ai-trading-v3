@@ -1,4 +1,5 @@
 """v4.5 strict read-only flow and REST quote regressions. Provider calls mocked."""
+from nova_release import APP_VERSION
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from fastapi.testclient import TestClient
@@ -104,4 +105,4 @@ def test_authenticated_mocked_http_data_and_no_secrets(monkeypatch):
         assert res.headers['cache-control']=='no-store'
         assert 'privateappsecret' not in res.text
     health=c.get('/healthz').json()
-    assert health['app_version']=='5.7.0' and not health['realtime_quote_websocket']
+    assert health['app_version']==APP_VERSION and not health['realtime_quote_websocket']
