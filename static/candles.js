@@ -346,12 +346,14 @@
      if(base&&(timeframe==='analysis'?base.source==='kis':provider==='kis'||base.source==='kis')){stopLive();startLive(serial);}
    });
    byId('candleMode').addEventListener('change',e=>{mode=e.target.value;render();});
-   const jump=byId('candleResearchJump');if(jump)jump.onclick=()=>{
+   const jump=byId('candleResearchJump'),chartJump=byId('candleChartExactSignals');const jumpToSignals=()=>{
      document.querySelector('[data-view="analyze"]')?.click();
      timeframe='analysis';const el=byId('candleTimeframe');if(el)el.value='analysis';
      try{localStorage.setItem('nova4-chart-timeframe','analysis');}catch{}
+     const researchToggle=byId('candleResearchOverlay'),priceToggle=byId('candleChartOverlay');if(researchToggle)researchToggle.checked=true;if(priceToggle)priceToggle.checked=true;
      void selectPeriod();
    };
+   if(jump)jump.onclick=jumpToSignals;if(chartJump)chartJump.onclick=jumpToSignals;
    const toggle=byId('candleResearchOverlay'),chartToggle=byId('candleChartOverlay');
    if(toggle)toggle.addEventListener('change',()=>{if(chartToggle)chartToggle.checked=toggle.checked;render();});
    if(chartToggle)chartToggle.addEventListener('change',()=>{if(toggle)toggle.checked=chartToggle.checked;render();});
