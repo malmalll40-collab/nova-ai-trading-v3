@@ -1,4 +1,5 @@
 """v4.1 OHLCV aggregation, privacy, auth, and UI regression coverage."""
+from nova_release import APP_VERSION
 import pandas as pd
 import pytest
 from datetime import datetime, timezone
@@ -121,7 +122,7 @@ def test_chart_isolated_from_trading_decisions(monkeypatch):
     monkeypatch.setattr(server,'_payload',lambda *a,**k: (_ for _ in ()).throw(AssertionError('chart must not call analysis')))
     assert c.get('/api/chart/history?symbol=005930.KS&timeframe=1w').status_code==200
     info=c.get('/healthz').json()
-    assert info['app_version']=='5.7.0'
+    assert info['app_version']==APP_VERSION
     assert info['higher_timeframe_charts'] and info['higher_timeframes_affect_signal'] is False
 
 
