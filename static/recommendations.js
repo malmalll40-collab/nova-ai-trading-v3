@@ -140,8 +140,8 @@
     const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
     const msg=({cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
     if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg,progress:d.progress});status(msg);}
-    else if($('patternStatus'))$('patternStatus').textContent=msg;
-    const button=$(pre+'Scan');if(button)button.disabled=Boolean(active||other||!ready);
+    else if($('patternStatus'))$('patternStatus').textContent=active&&d.status==='running'?'검색 진행 중 · '+msg:msg;
+    const button=$(pre+'Scan');if(button)button.disabled=Boolean(submitting||active||other||!ready);
     const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=d.status!=='running'||!d.job_id;
     const target=p==='full'?'recommendResults':'patternResults';
     const matches=d.market===o.market&&d.depth===o.depth&&(o.source==='auto'?(d.fsc_configured?'fsc':'krx')===d.source:o.source===d.source);
@@ -154,7 +154,8 @@
     }
   }
   async function fetchState(){
-    if(preview||busy)return;busy=true;
+    if(preview){for(const p of ['full','pattern']){const b=$(prefix(p)+'Scan');if(b)b.disabled=true;const s=$(prefix(p)+'Status');if(s)s.textContent='체험판에서는 실제 검색을 실행하지 않습니다.';}return;}
+    if(busy)return;busy=true;
     try{
       const states=await Promise.all(['full','pattern'].map(async p=>{
         const r=await fetch('/api/recommendations/status?profile='+p,{headers:headers(),cache:'no-store'});
@@ -173,7 +174,7 @@
       const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:d.detail?.message||'검색 실패');
       applyState(p,d);startPoll();await fetchState();
     }catch(e){$(prefix(p)+'Status').textContent=e.message;await fetchState();}
-    finally{submitting=false;}
+    finally{submitting=false;await fetchState();}
   }
   async function cancel(p){
     const d=jobs[p];if(!d.job_id||d.status!=='running')return;
