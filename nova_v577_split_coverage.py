@@ -93,11 +93,14 @@ class SplitBudget(Budget):
 
 
 def run_group(api,checkpoint,*,telemetry,now=lambda:datetime.now(timezone.utc),
-              clock=time.monotonic,pause=time.sleep,progress=None):
+              clock=time.monotonic,pause=time.sleep,progress=None,
+              max_streams=None,page_pause=2.0,max_seconds=MAX_SECONDS):
     """At most one group per invocation; only fully audited streams are resumable.
     api is an injected read-only client. No automatic retry, scheduler or persistence.
     A partially collected symbol is restarted, never treated as completed.
     """
+    if max_streams is not None and (type(max_streams) is not int or not 1<=max_streams<=5):raise ValueError('INVALID_SLICE')
+    if not 2<=page_pause<=10 or not 1<=max_seconds<=180:raise ValueError('INVALID_BUDGET')
     cp=json.loads(json.dumps(checkpoint,allow_nan=False))
     start,end,expected=validate_checkpoint(cp)
     completed=cp['completed']; offset=len(completed)
@@ -116,11 +119,13 @@ def run_group(api,checkpoint,*,telemetry,now=lambda:datetime.now(timezone.utc),
         return report('PAUSED','COOLDOWN')
     index=next(i for i in range(len(GROUPS)) if offset<sum(len(g) for g in GROUPS[:i+1]))
     group=GROUPS[index]; begin=sum(len(g) for g in GROUPS[:index])
-    budget=SplitBudget(telemetry,now,max_calls=PAGE_LIMITS[index],max_seconds=MAX_SECONDS,clock=clock)
+    budget=SplitBudget(telemetry,now,max_calls=PAGE_LIMITS[index],max_seconds=max_seconds,clock=clock)
     attempted=[]
-    for s in group[offset-begin:]:
+    remaining=group[offset-begin:]
+    if max_streams is not None:remaining=remaining[:max_streams]
+    for s in remaining:
         stats,records=collect(api,s,start,end,expected,budget,
-            max_pages=MAX_INDEX_PAGES if s in INDEX_CODES else MAX_PAGES,pause=lambda _:pause(2.0))
+            max_pages=MAX_INDEX_PAGES if s in INDEX_CODES else MAX_PAGES,pause=lambda _:pause(page_pause))
         stats['official_closure_conflicts']=[d.isoformat() for d in sorted(set(records)&set(CLOSURES))]
         if stats['official_closure_conflicts'] or stats['duplicate_rows']:
             stats['status']='PARTIAL'
@@ -133,6 +138,7 @@ def run_group(api,checkpoint,*,telemetry,now=lambda:datetime.now(timezone.utc),
             return report('PAUSED',stats['reason'] if stats['reason']!='WINDOW_REACHED' else 'QUALITY_GATE',index+1,budget.calls,attempted)
         completed.append(stats)
         # Pace symbol boundaries too, not just pagination.
-        if s!=group[-1]:pause(2.0)
+        if s!=remaining[-1]:pause(page_pause)
     cp['not_before']=(utc(now())+timedelta(seconds=COOLDOWN)).isoformat()
-    return report('READY' if len(completed)==len(SYMBOLS) else 'GROUP_READY',None,index+1,budget.calls,attempted)
+    group_finished=len(completed)==begin+len(group)
+    return report('READY' if len(completed)==len(SYMBOLS) else 'GROUP_READY' if group_finished else 'SLICE_READY',None,index+1,budget.calls,attempted)
