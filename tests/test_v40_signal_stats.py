@@ -1,4 +1,5 @@
 """v4.0 role-level signal research regression tests."""
+from nova_release import APP_VERSION
 from datetime import datetime
 import math
 from copy import deepcopy
@@ -101,7 +102,7 @@ def test_api_no_orders_still_auth_and_research_does_not_change_signal(monkeypatc
     monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
     testclient=TestClient(server.app)
     v=testclient.get('/healthz').json()
-    assert v['app_version']=='5.7.0' and v['signal_role_statistics'] is True
+    assert v['app_version']==APP_VERSION and v['signal_role_statistics'] is True
     assert v['calibrated_buy_probability'] is False and v['orders_enabled'] is False
     body=testclient.get('/api/analysis?source=demo&mode=스윙&cost_bps=15').json()
     assert len(body['signal_performance']['roles'])==10
