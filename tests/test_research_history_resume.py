@@ -155,3 +155,19 @@ def test_integrity_rejection_exposes_safe_detail_without_writes(db):
     r=run(db,Bad())
     assert r['reason']=='WINDOW_INTEGRITY_REJECTED' and r['new_rows']==0
     assert r['window_diagnostic']['reason']=='CONFLICTING_DUPLICATE'
+
+def test_unverified_dispatch_keeps_existing_checkpoint_without_network_retry(db):
+    from nova_v579_admission import ResearchBlocked
+    with db() as (cur,kind):
+        dataset=initialize(cur,kind,D)
+        append(cur,kind,dataset,SYMBOLS[0],{D[-1]:{'close':100}})
+    class Refused(API):
+        def get(self,*args):
+            self.calls.append('admission')
+            raise ResearchBlocked('SHARED_QUOTA_DISPATCH_UNVERIFIED')
+    api=Refused()
+    r=run(db,api)
+    assert r['window_diagnostic']['reason']=='SHARED_QUOTA_DISPATCH_UNVERIFIED'
+    assert r['new_rows']==0 and len(api.calls)==1
+    with db() as (cur,kind):
+        assert saved(cur,kind,dataset,SYMBOLS[0])=={D[-1]:{'close':100.0}}

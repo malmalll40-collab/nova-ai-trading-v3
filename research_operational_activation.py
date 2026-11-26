@@ -117,7 +117,7 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
                     emit('research_ml_result',{'cohort':k,'overall':metrics.get('overall'),'research_only':True})
             full=out['expected_rows'] is not None and out['stored_rows']==out['expected_rows']
             if (out['collection_reason'] in PROVIDER_STOPS
-                    or out['collection_reason'] in ('WINDOW_INTEGRITY_REJECTED','SHARED_QUOTA_RELEASE_UNVERIFIED',
+                    or out['collection_reason'] in ('WINDOW_INTEGRITY_REJECTED','SHARED_QUOTA_RELEASE_UNVERIFIED','SHARED_QUOTA_DISPATCH_UNVERIFIED',
                         'ADJUSTED_HISTORY_OVERLAP_CONFLICT','OVERLAP_ANCHOR_MISSING')):
                 emit('research_collection_stop',{'reason':out['collection_reason'],'orders_enabled':False})
                 break
