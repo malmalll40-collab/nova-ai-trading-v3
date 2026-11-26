@@ -40,6 +40,20 @@ def exclusive_run(dsn, *, session_mode_confirmed=False, connect=None):
             try:
                 cur.execute('SELECT pg_backend_pid()')
                 pid=cur.fetchone()[0]
+                @contextmanager
+                def transaction():
+                    # Use the very session that owns the advisory lock. If it dies,
+                    # this transaction cannot commit via a different connection.
+                    with db.transaction():
+                        with db.cursor() as tx:
+                            if not alive():
+                                raise RuntimeError('RUN_LOCK_LOST')
+                            tx.execute("SET LOCAL statement_timeout = '5s'")
+                            tx.execute("SET LOCAL lock_timeout = '2s'")
+                            yield tx,'postgresql'
+                            if not alive():
+                                raise RuntimeError('RUN_LOCK_LOST')
+                alive.transaction=transaction
                 yield alive
             finally:
                 try:cur.execute('SELECT pg_advisory_unlock(%s)',(LOCK_KEY,))
@@ -92,7 +106,6 @@ def run_exclusive(dsn,api,sessions,*,now,calendar,admission,
                   session_mode_confirmed=False,connect=None,**limits):
     """Lock only coordinates research runs in the same database; not quota proof."""
     from research_history_resume import resume
-    from research_history_postgres import transaction_factory
     blocked={'status':'BLOCKED','reason':'RUN_LOCK_OR_ADMISSION_UNVERIFIED',
              'new_rows':0,'logical_calls':0,'training_ready':False,
              'strategy_adoption':'HOLD','orders_enabled':False}
@@ -104,7 +117,7 @@ def run_exclusive(dsn,api,sessions,*,now,calendar,admission,
                 return {**blocked,'reason':'DUPLICATE_RUN'}
             if callable(getattr(api,'bind_lock',None)):
                 api.bind_lock(alive)
-            return resume(api,sessions,transaction=transaction_factory(dsn,connect=connect),now=now,calendar=calendar,
+            return resume(api,sessions,transaction=alive.transaction,now=now,calendar=calendar,
                           admission=lambda:alive() and admission() is True,**limits)
     except Exception:
         return {**blocked,'reason':'RUN_COORDINATION_FAILED'}

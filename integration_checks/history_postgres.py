@@ -67,6 +67,38 @@ def main():
     assert status['stored_rows']==3 and status['complete_streams']==1
     assert status['expected_rows']==3*len(SYMBOLS) and status['training_ready'] is False
     assert status['status']=='PARTIAL' and status['execution_authorized'] is False
+    # A provider response arriving after the owner session dies must never
+    # be appended via a separate PostgreSQL connection. Use a second cohort.
+    from research_history_run_control import LOCK_KEY
+    other_days=tuple(d-timedelta(days=7) for d in days)
+    class DisconnectingAPI:
+        def __init__(self):self.calls=0
+        def get(self,path,tr,params):
+            self.calls+=1
+            with psycopg.connect(dsn,autocommit=True) as killer:
+                with killer.cursor() as cur:
+                    cur.execute("SELECT pid FROM pg_locks WHERE locktype='advisory' AND classid=0 AND objid=%s AND objsubid=1 AND granted AND database=(SELECT oid FROM pg_database WHERE datname=current_database())",(LOCK_KEY,))
+                    owner=cur.fetchall()
+                    assert len(owner)==1
+                    cur.execute('SELECT pg_terminate_backend(%s)',(owner[0][0],))
+                    assert cur.fetchone()==(True,)
+            return {'output2':[{'stck_bsop_date':d.strftime('%Y%m%d'),'bstp_nmix_prpr':'100'} for d in other_days]}
+    interrupted=DisconnectingAPI()
+    outcome=run_exclusive(dsn,interrupted,other_days,
+        now=lambda:datetime(2026,11,26,21,tzinfo=KST),
+        calendar=lambda t:{'calendar_verified':True,'status':'CLOSED','open_kst':'09:00','close_kst':'15:30'},
+        admission=lambda:True,session_mode_confirmed=True,pause=lambda n:None,max_windows=1)
+    assert interrupted.calls==1 and outcome['status']=='PARTIAL' and outcome['new_rows']==0
+    assert outcome['reason']=='CHECKPOINT_OR_ADMISSION_FAILED'
+    assert read_status(dsn,other_days)['stored_rows']==0
+    assert read_status(dsn,days)['stored_rows']==3
+    with exclusive_run(dsn,session_mode_confirmed=True) as alive:
+        assert alive and alive()
+        with alive.transaction() as (cur,kind):
+            assert kind=='postgresql'
+            cur.execute("SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND pid=pg_backend_pid() AND objid=%s AND granted",(LOCK_KEY,))
+            assert cur.fetchone()==(1,)
+    print('Lock-bound checkpoint PASS: terminated owner cannot persist, lock released')
     with tx() as (cur,kind):
         cur.execute(f'UPDATE {TABLE} SET digest=%s WHERE dataset=%s AND symbol=%s',('bad',dataset,symbol))
     assert read_status(dsn,days)['status']=='UNAVAILABLE'
