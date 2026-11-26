@@ -142,7 +142,36 @@ def run(dsn,*,collection=None,allow_collection=False,calendar=session_dates,read
             report['collection']={k:progress[k] for k in ('status','reason','new_rows','logical_calls') if k in progress}
         if status.get('status')!='COVERAGE_COMPLETE' or panel is None:
             return {**report,'status':'BLOCKED','reason':'COMPLETE_SNAPSHOT_REQUIRED'}
-        result=evaluator(panel,days)
+        try:
+            result=evaluator(panel,days)
+        except ValueError as exc:
+            allowed={'ZERO_VOLUME_FILL_UNVERIFIED','FEATURES_UNAVAILABLE','POINT_UNAVAILABLE',
+                     'INSUFFICIENT_SESSIONS','INVALID_OUTCOME','INCOMPLETE_PANEL','FEATURE_DATES_CHANGED'}
+            code=str(exc)
+            return {**report,'status':'BLOCKED','reason':code if code in allowed else 'EVALUATION_FAILED'}
+        except Exception:
+            return {**report,'status':'BLOCKED','reason':'EVALUATION_FAILED'}
         return {**report,'status':result['status'],'evaluation':{**result,**BASE}}
     except Exception:
         return {**BASE,'status':'BLOCKED','reason':'PIPELINE_FAILED'}
+
+
+def run_bounded(pooled_dsn,*,kis,telemetry,coordinator,session_mode_confirmed,
+                now,calendar,allow_collection=False,historical_calendar=session_dates):
+    """Wire explicit collection to the existing quota and run-lock admission.
+    No production caller is installed. A successful standalone DB probe is
+    not a session-mode authorization. Missing configuration stays blocked.
+    """
+    from research_db_endpoint import direct_candidate
+    from research_history_execution import execute
+    dsn=direct_candidate(pooled_dsn)
+    def collect():
+        if dsn is None:
+            return {'status':'BLOCKED','reason':'DIRECT_CANDIDATE_UNAVAILABLE','new_rows':0}
+        if getattr(telemetry,'_shared_gate',None) is None:
+            return {'status':'BLOCKED','reason':'SHARED_GATE_NOT_INSTALLED','new_rows':0}
+        return execute(dsn,kis=kis,telemetry=telemetry,coordinator=coordinator,
+            session_mode_confirmed=session_mode_confirmed,now=now,calendar=calendar,
+            historical_calendar=historical_calendar)
+    return run(pooled_dsn,collection=collect,allow_collection=allow_collection,
+               calendar=historical_calendar)
