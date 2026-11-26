@@ -1,3 +1,4 @@
+from nova_release import APP_VERSION
 from pathlib import Path
 from fastapi.testclient import TestClient
 import server
@@ -14,7 +15,7 @@ def test_guide_tab_in_rendered_shell_and_version():
     assert 'id="view-guide"' in h
     assert h.count('class="guide-step"') == 11
     assert h.index('id="view-guide"') > h.index('id="view-finance"')
-    assert client.get('/healthz').json()['app_version'] == '5.7.0'
+    assert client.get('/healthz').json()['app_version'] == APP_VERSION
 
 
 def test_guide_explains_existing_functions_without_fabricated_accuracy():
