@@ -76,7 +76,15 @@ async def _app_lifespan(application):
         _ops_startup()
     except Exception:
         logging.getLogger('uvicorn.error').warning('NOVA_OPS startup diagnostic failed; service remains available')
-    yield
+    stop_preflight = threading.Event()
+    try:
+        threading.Thread(target=_ops_preflight_loop,args=(stop_preflight,),daemon=True,name='nova-ops-preflight').start()
+    except Exception:
+        logging.getLogger('uvicorn.error').warning('NOVA_OPS preflight monitor unavailable')
+    try:
+        yield
+    finally:
+        stop_preflight.set()
 
 
 app = FastAPI(title='NOVA AI Trading Mobile', docs_url=None, redoc_url=None, openapi_url=None, lifespan=_app_lifespan)
@@ -2230,6 +2238,42 @@ def _start_v574_data_probe(version='574'):
         emit(event+'_end',{'status':'UNAVAILABLE','reason':'THREAD_START_FAILED','strategy_adoption':'HOLD'})
         return 'failed'
     return 'running'
+
+
+def _ops_preflight_snapshot():
+    from ops_preflight import snapshot
+    from nova_v578_kis_telemetry import KIS_LOAD
+    now=datetime.now(KST)
+    schedule=krx_session(now)
+    with SCAN_LOCK:
+        jobs={f'scan_{p}':SCAN_PROFILES[p].get('status') for p in ('full','pattern')}
+    for name,lock,state in (
+        ('backtest',BACKTEST_LOCK,BACKTEST_STATE),
+        ('popular',POPULAR_LOCK,POPULAR_STATE),
+        ('autotrack',AUTO_LOCK,AUTO_STATE),
+        ('prospective',CORE561_LOCK,CORE561_JOB),
+        ('batch',BATCH_RESEARCH_LOCK,BATCH_RESEARCH_STATE),
+        ('diagnostics',OPS_LOCK,OPS_STATE),
+    ):
+        with lock:
+            jobs[name]=state.get('status')
+    return snapshot(now,schedule,KIS_LOAD.snapshot(),jobs)
+
+
+def _ops_preflight_loop(stop):
+    """Observe only while process is alive; never wake a suspended service."""
+    from ops_diagnostics import emit
+    first=True
+    while not stop.is_set():
+        try:
+            now=datetime.now(KST)
+            if first or now.hour>=20 or now.hour<=7:
+                emit('ops_preflight',_ops_preflight_snapshot())
+        except Exception:
+            emit('ops_preflight',{'local_preflight':'BLOCKED','reason':'SNAPSHOT_UNAVAILABLE','execution_authorized':False,'orders_enabled':False})
+        first=False
+        if stop.wait(60):
+            break
 
 
 def _ops_startup():
