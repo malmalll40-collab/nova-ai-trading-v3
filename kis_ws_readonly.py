@@ -16,6 +16,7 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
+from nova_v578_kis_telemetry import KIS_LOAD
 
 KST=ZoneInfo('Asia/Seoul')
 _WS_LOCK=threading.Lock()
@@ -41,18 +42,25 @@ def status():
 
 
 def approval_key() -> str:
+    # The worker can outlive the async wait timeout; retain its own foreground scope.
+    with KIS_LOAD.foreground():
+        return _approval_key()
+
+
+def _approval_key() -> str:
     global _APPROVAL,_APPROVAL_AT
     if not enabled():raise RuntimeError('WEBSOCKET_DISABLED')
     with _WS_LOCK:
         if _APPROVAL and time.monotonic()-_APPROVAL_AT < 5*3600:
             return _APPROVAL
-        r=requests.post('https://openapi.koreainvestment.com:9443/oauth2/Approval',
-                        json={'grant_type':'client_credentials',
-                              'appkey':os.environ['KIS_APP_KEY'],
-                              'secretkey':os.environ['KIS_APP_SECRET']},timeout=12)
-        r.raise_for_status()
-        key=r.json().get('approval_key')
-        if not isinstance(key,str) or len(key)<15:raise RuntimeError('KIS_APPROVAL_UNAVAILABLE')
+        with KIS_LOAD.physical(token=True):
+            r=requests.post('https://openapi.koreainvestment.com:9443/oauth2/Approval',
+                            json={'grant_type':'client_credentials',
+                                  'appkey':os.environ['KIS_APP_KEY'],
+                                  'secretkey':os.environ['KIS_APP_SECRET']},timeout=12)
+            r.raise_for_status()
+            key=r.json().get('approval_key')
+            if not isinstance(key,str) or len(key)<15:raise RuntimeError('KIS_APPROVAL_UNAVAILABLE')
         _APPROVAL=key
         _APPROVAL_AT=time.monotonic()
         return key
@@ -85,6 +93,14 @@ def trade_frame(raw:str,code:str)->dict|None:
 
 
 async def relay(client,code:str):
+    """Observe the entire user-requested subscription, including approval wait."""
+    if not enabled() or not re.fullmatch(r'\d{6}',code):
+        return await _relay(client,code)
+    with KIS_LOAD.foreground():
+        return await _relay(client,code)
+
+
+async def _relay(client,code:str):
     """Requires an already accepted authenticated FastAPI WebSocket."""
     if not enabled():
         await client.send_json({'type':'error','message':'실시간 체결 실험 기능이 비활성화되어 있습니다.'})
