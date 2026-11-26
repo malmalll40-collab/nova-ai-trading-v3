@@ -135,17 +135,43 @@
   }
   const jobs={full:{},pattern:{}};
   const activeStates=['queued','running','cancelling','finalizing'];
+  // Keep only opaque job identifiers in this browser tab, not credentials or results.
+  // Network errors are not evidence of cancellation; wait for a valid server snapshot.
+  const tracked={full:null,pattern:null};
+  const interrupted={full:false,pattern:false};
+  for(const p of ['full','pattern']){
+    try{const id=sessionStorage.getItem('nova-scan-active-'+p);if(/^[0-9a-f]{16}$/.test(id||''))tracked[p]=id;}catch{}
+  }
+  function remember(p,id){
+    tracked[p]=id;
+    try{if(id)sessionStorage.setItem('nova-scan-active-'+p,id);else sessionStorage.removeItem('nova-scan-active-'+p);}catch{}
+  }
+  function reconcile(p,d){
+    const id=typeof d.job_id==='string'&&/^[0-9a-f]{16}$/.test(d.job_id)?d.job_id:null;
+    const active=activeStates.includes(d.status);
+    const terminal=['complete','failed','cancelled','canceled'].includes(d.status);
+    if(tracked[p]&&((d.status==='idle')||(id&&id!==tracked[p]))){
+      interrupted[p]=true;
+      remember(p,null);
+    }
+    if(active&&id)remember(p,id);
+    else if(terminal&&id&&id===tracked[p])remember(p,null);
+    return interrupted[p];
+  }
+  function clearInterruption(p){interrupted[p]=false;}
+
   const prefix=p=>p==='full'?'recommend':'pattern';
   const options=p=>({market:$(prefix(p)+'Market')?.value||'all',source:$(prefix(p)+'Source')?.value||'auto',depth:Number($(prefix(p)+'Depth')?.value||48),profile:p});
   function applyState(p,d){
+    const lost=reconcile(p,d);
     jobs[p]=d;
     window.NOVAHome?.scanState(p,d);
     const pre=prefix(p), active=activeStates.includes(d.status), other=d.active_profile&&d.active_profile!==p;
     const o=options(p),ready=o.source==='fsc'?d.fsc_configured:o.source==='krx'?d.krx_configured:d.fsc_configured||d.krx_configured;
     const elapsed=Number.isFinite(d.result?.elapsed_seconds)?' · '+d.result.elapsed_seconds+'초':'';
     const msg=({queued:'독립 검색 대기 · 앞선 검색 완료 후 자동 시작',cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 미완료 결과 제외',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료'+elapsed,idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
-    const wait=other&&!active?' · 다른 검색 실행 중에도 독립 요청 가능':'';
-    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg+wait,progress:d.progress});status(msg+wait);}
+    const wait=(lost?' · 이전 검색의 완료 여부 미확인(서버 재시작 또는 작업 변경). 필요하면 다시 검색하세요.':'')+(other&&!active?' · 다른 검색 실행 중에도 독립 요청 가능':'');
+    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'||lost?'failed':'idle',{message:msg+wait,progress:d.progress});status(msg+wait,lost);}
     else if($('patternStatus'))$('patternStatus').textContent=(active&&d.status==='running'?'검색 진행 중 · '+msg:msg)+wait;
     const button=$(pre+'Scan');if(button)button.disabled=Boolean(submitting||active||!ready);
     const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=!['queued','running'].includes(d.status)||!d.job_id;
@@ -156,7 +182,7 @@
     }else if(!active){
       $(target)?.replaceChildren();
       if(p==='full'&&$('recommendNumbers'))$('recommendNumbers').hidden=true;
-      if(d.status==='complete'&&!matches)$(pre+'Status').textContent='이전 검색 조건과 다릅니다. 새 검색을 실행하세요.';
+      if(d.status==='complete'&&!matches)$(pre+'Status').textContent='이전 검색 조건과 다릅니다. 새 검색을 실행하세요.'+wait;
     }
   }
   async function fetchState(){
@@ -197,6 +223,7 @@
     try{
       const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify(options(p)),cache:'no-store'});
       const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:d.detail?.message||'검색 실패');
+      clearInterruption(p);remember(p,null);
       applyState(p,d);startPoll();
     }catch(e){$(prefix(p)+'Status').textContent=e.message;}
     finally{submitting=false;await fetchState();}
