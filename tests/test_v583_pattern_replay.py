@@ -25,7 +25,10 @@ def test_multi_horizon_time_split_and_cost():
         early=r['results'][k]['earlier'];late=r['results'][k]['later']
         assert early['end']<late['start']
         assert early['all_buy']['samples']>=late['all_buy']['samples']
-        assert early['all_buy']['mean_net_pct']>early['all_buy']['stress_mean_pct']
+        if early['all_buy']['sufficient']:
+            assert early['all_buy']['mean_net_pct']>early['all_buy']['stress_mean_pct']
+        else:
+            assert early['all_buy']['mean_net_pct'] is None
         assert sum(v['samples'] for v in early['by_count'].values())==early['all_buy']['samples']
         assert early['all_buy']['samples']==early['pattern_candidate']['samples']+early['other_buy']['samples']
 
