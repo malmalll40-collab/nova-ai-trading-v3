@@ -5,7 +5,7 @@ const vm=require('node:vm');
 function harness(){
   const nodes=new Map(),requests=[],handlers={};
   const el=id=>{
-    if(!nodes.has(id))nodes.set(id,{id,hidden:id==='patternMenuBody',disabled:false,value:id==='recommendDepth'?'48':id==='recommendMarket'?'all':'auto',textContent:'',dataset:{},style:{},attrs:{},children:[],classList:{toggle(){}},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},replaceChildren(){this.children=[];},append(...x){this.children.push(...x);},appendChild(x){this.append(x);}});
+    if(!nodes.has(id))nodes.set(id,{id,hidden:false,disabled:id==='patternScan',value:id==='recommendDepth'?'48':id==='recommendMarket'?'all':'auto',textContent:'',dataset:{},style:{},attrs:{},children:[],classList:{toggle(){}},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},replaceChildren(){this.children=[];},append(...x){this.children.push(...x);},appendChild(x){this.append(x);}});
     return nodes.get(id);
   };
   let response={status:'idle',fsc_configured:true};
@@ -14,13 +14,16 @@ function harness(){
   handlers.DOMContentLoaded();
   return {el,window,requests,setResponse:x=>response=x};
 }
-test('pattern menu exists before search and opens without network traffic',()=>{
+test('pattern controls are always visible before search and initialize without network traffic',()=>{
   const html=fs.readFileSync('static/index.html','utf8');
-  for(const id of ['patternMenu','patternMenuToggle','patternMenuBody','patternScan','patternStatus','patternResults'])assert.ok(html.includes('id="'+id+'"'));
+  for(const id of ['patternMenu','patternMenuBody','patternScan','patternStatus','patternResults'])assert.ok(html.includes('id="'+id+'"'));
   assert.ok(html.indexOf('id="patternMenu"')<html.indexOf('id="popularPanel"'));
-  const h=harness();h.el('patternMenuToggle').onclick();
+  assert.ok(!html.includes('id="patternMenuToggle"'));
+  assert.ok(html.includes('id="patternMenuBody">'));
+  const h=harness();
   assert.equal(h.el('patternMenuBody').hidden,false);
-  assert.equal(h.el('patternMenuToggle').attrs['aria-expanded'],'true');
+  assert.equal(h.el('patternScan').disabled,false);
+  assert.equal(typeof h.el('patternScan').onclick,'function');
   assert.equal(h.requests.length,0);
 });
 test('both buttons share the single scan and progress; second click blocked',async()=>{
