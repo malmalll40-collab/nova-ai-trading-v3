@@ -26,17 +26,23 @@ test('pattern controls are always visible before search and initialize without n
   assert.equal(typeof h.el('patternScan').onclick,'function');
   assert.equal(h.requests.length,0);
 });
-test('both buttons share the single scan and progress; second click blocked',async()=>{
+test('both buttons accept independent requests after first submission; duplicate blocked',async()=>{
   const h=harness();
   h.setResponse('pattern',{status:'running',active_profile:'pattern',progress:{phase:'deep',done:2,total:48}});
   h.setResponse('full',{status:'idle',fsc_configured:true,active_profile:'pattern'});
   const first=h.el('patternScan').onclick();
   assert.equal(h.el('recommendScan').disabled,true);
   assert.equal(h.el('patternScan').disabled,true);
-  await h.el('recommendScan').onclick();
+  await h.el('patternScan').onclick();
   await first;
   assert.equal(h.requests.filter(x=>x.url==='/api/recommendations/run').length,1);
+  assert.equal(h.el('recommendScan').disabled,false);
   assert.ok(h.el('patternStatus').textContent.includes('검색 진행 중'));
+  h.setResponse('full',{status:'queued',job_id:'f1',fsc_configured:true,active_profile:'pattern'});
+  await h.el('recommendScan').onclick();
+  assert.equal(h.requests.filter(x=>x.url==='/api/recommendations/run').length,2);
+  assert.ok(h.el('recommendStatus').textContent.includes('독립 검색 대기'));
+  assert.equal(h.el('recommendCancel').disabled,false);
 });
 test('changed options clear previously shown pattern results immediately',()=>{
   const h=harness();h.el('patternResults').append('old rank');
@@ -82,7 +88,7 @@ test('cancel addresses only the running profile and exact job id',async()=>{
   await h.window.NOVAScanner.load();
   assert.equal(h.el('patternCancel').disabled,false);
   assert.equal(h.el('recommendCancel').disabled,true);
-  assert.equal(h.el('recommendScan').disabled,true);
+  assert.equal(h.el('recommendScan').disabled,false);
   h.setResponse('pattern',{status:'cancelling',active_profile:'pattern',job_id:'p1',fsc_configured:true});
   await h.el('patternCancel').onclick();
   const req=h.requests.find(x=>x.url==='/api/recommendations/cancel');
@@ -138,7 +144,7 @@ test('one combined status poll and explicit separate work states',async()=>{
   await h.window.NOVAScanner.load();
   assert.equal(h.requests.filter(x=>x.url.includes('/status')).length,1);
   assert.ok(h.requests[0].url.includes('profile=all'));
-  assert.ok(h.el('recommendStatus').textContent.includes('다른 검색이 실행 중'));
+  assert.ok(h.el('recommendStatus').textContent.includes('다른 검색 실행 중에도 독립 요청 가능'));
   assert.ok(h.el('patternStatus').textContent.includes('검색 진행 중'));
 });
 test('429 respects retry interval and reconnects without starting or cancelling any scan',async()=>{
@@ -159,4 +165,17 @@ test('429 respects retry interval and reconnects without starting or cancelling 
   assert.ok(h.el('patternStatus').textContent.includes('검색 진행 중'));
   assert.equal(h.el('patternCancel').disabled,false);
   assert.ok(h.requests.every(x=>x.url.includes('/status')));
+});
+
+test('zero strict results distinguish valid no-buy from incomplete data',async()=>{
+  const h=harness();
+  const done={status:'complete',fsc_configured:true,source:'fsc',depth:48,market:'all',job_id:'f'};
+  const base={data_date:'20261125',recommendations:[],interest_candidates:[],recommended_count:0,deep_target:60,deep_succeeded:60};
+  h.setResponse('full',{...done,result:{...base,scan_assessment:{status:'NO_STRICT_CANDIDATES',data_limited_first_rejections:0,validation_first_rejections:15}}});
+  await h.window.NOVAScanner.load();
+  const text=n=>[n.textContent,...n.children.map(text)].join(' ');
+  assert.ok(text(h.el('recommendResults')).includes('검토한 후보에서 모든 엄격 매수 조건'));
+  h.setResponse('full',{...done,result:{...base,scan_assessment:{status:'DATA_LIMITED',data_limited_first_rejections:60,validation_first_rejections:0}}});
+  await h.window.NOVAScanner.load();
+  assert.ok(text(h.el('recommendResults')).includes('확정할 수 없습니다'));
 });

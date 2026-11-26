@@ -19,7 +19,7 @@ def test_served_index_release_and_discovery():
     assert 'id="patternMenu"' in html
     assert 'id="patternMenuBody">' in html
     assert 'id="patternMenuToggle"' not in html
-    for asset in ('pattern_research.js','recommendations.js'):
+    for asset in ('pattern_research.js','recommendations.js','candles.js'):
         assert '/static/'+asset+'?v='+APP_VERSION+'"' in html
     assert r.headers['cache-control']=='no-cache'
 

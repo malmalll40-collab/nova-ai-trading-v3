@@ -12,6 +12,7 @@ def setup(monkeypatch):
     states={'full':{'status':'idle'},'pattern':{'status':'idle'}}
     monkeypatch.setattr(server,'SCAN_PROFILES',states)
     monkeypatch.setattr(server,'SCAN_CANCEL',threading.Event())
+    monkeypatch.setattr(server,'SCAN_PENDING',{})
     monkeypatch.setattr(server,'_authorize',lambda r:None)
     monkeypatch.setattr(server,'_limit',lambda r:None)
     monkeypatch.setattr(server,'evidence_backend',lambda:'disabled')
@@ -47,15 +48,16 @@ def test_cancelled_worker_does_not_publish_or_persist(monkeypatch):
     assert s['full']['status']=='cancelled' and s['full']['result'] is None
     assert s['pattern']['result']=={'preserve':True}
 
-def test_finalizing_blocks_cancellation_and_second_scan(monkeypatch):
+def test_finalizing_blocks_cancellation_but_accepts_independent_queue(monkeypatch):
     s=setup(monkeypatch)
     s['full'].update(status='finalizing',job_id='f')
     with pytest.raises(server.HTTPException) as e:
         server.recommendations_cancel(None,{'profile':'full','job_id':'f'})
     assert e.value.status_code==409 and not server.SCAN_CANCEL.is_set()
-    with pytest.raises(server.HTTPException) as e:
-        server.recommendations_run(None,{'profile':'pattern'})
-    assert e.value.status_code==409
+    r=server.recommendations_run(None,{'profile':'pattern'})
+    assert json.loads(r.body)['status']=='queued'
+    assert s['full']['status']=='finalizing' and 'pattern' in server.SCAN_PENDING
+    assert not server.SCAN_CANCEL.is_set()
 
 def test_checkpoint_stops_before_next_symbol(monkeypatch):
     rows=[{'symbol':'005930.KS','name':'a','market':'kospi','selection_lane':'유동성'},{'symbol':'000660.KS','name':'b','market':'kospi','selection_lane':'유동성'}]
