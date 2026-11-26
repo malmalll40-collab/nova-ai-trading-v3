@@ -66,3 +66,25 @@ test('shell includes renderer before legacy recommendations and network-first ca
   assert.ok(js.includes('const items=Array.isArray(res.recommendations)'));
   assert.ok(js.includes('const interests=Array.isArray(res.interest_candidates)'));
 });
+
+test('actual Python adapter and rank output renders without hand-written result keys',()=>{
+  const {execFileSync}=require('node:child_process');
+  const script=`import json
+from pytest import MonkeyPatch
+from tests.test_v584_pattern_scan import candidate_input
+from nova_v584_pattern_scan import candidate, finish
+with MonkeyPatch.context() as m:
+    s,d=candidate_input(m)
+    row,reason=candidate(s,d,'20261125','20261125')
+    assert row is not None and reason is None
+    p=finish([row],{'SESSION_MISMATCH':1},asof='20261125',target=2)
+    print(json.dumps({'data_date':'20261125','deep_failed':0,'signal_pattern_research':p},allow_nan=False))
+`;
+  const res=JSON.parse(execFileSync(process.env.PYTHON||'python',['-c',script],{encoding:'utf8'}));
+  const {window,parent}=env();
+  window.NOVAPatternResearch.render(parent,res);
+  const t=text(parent);
+  assert.equal(all(parent).filter(n=>n.tagName==='article').length,1);
+  for(const word of ['sample','1위','10회','거래일 누락·불일치','연구 점수','상승 지속형','20261125'])assert.ok(t.includes(word),word);
+  assert.ok(!t.includes('미확인'));
+});
