@@ -216,6 +216,26 @@ def main():
     assert sorted(results)==[False,True] and not b.claim('kospi')
     assert b.claim('kosdaq') and not a.claim('kosdaq')
     print('KRX one-shot probe ledger PASS: cross-process durable deduplication')
+    from research_krx_collection import CollectorStore
+    store=CollectorStore(dsn,days)
+    store.setup()
+    info,saved,held=store.status()
+    assert info['stored_rows']==1 and not held
+    assert not store.claim('kospi_dd_trd',d)
+    assert store.claim('kosdaq_dd_trd',d)
+    assert not store.claim('stk_bydd_trd',d)
+    q={'OutBlock_1':[{'BAS_DD':d.strftime('%Y%m%d'),'IDX_NM':'코스닥','CLSPRC_IDX':'800.25'}]}
+    try:store.save('kosdaq_dd_trd',d,q,authorized=lambda s,t:False)
+    except ValueError:pass
+    else:raise AssertionError('unauthorized save accepted')
+    assert store.status()[2]=={('kosdaq_dd_trd',d.isoformat())}
+    assert store.save('kosdaq_dd_trd',d,q,authorized=lambda s,t:(s,t)==('kosdaq_dd_trd',d))==1
+    assert store.status()[0]['stored_rows']==2 and not store.status()[2]
+    assert not store.claim('kosdaq_dd_trd',d)
+    assert store.claim('stk_bydd_trd',d)
+    store.fail('stk_bydd_trd',d)
+    assert not store.claim('ksq_bydd_trd',d)
+    print('KRX private collector PASS: committed claim, atomic snapshot, rollback, durable stop and resume')
     print('PostgreSQL integration PASS: durable resume, idempotence, rollback, isolated rows')
 if __name__=='__main__':
     main()
