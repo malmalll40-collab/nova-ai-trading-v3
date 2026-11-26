@@ -105,4 +105,4 @@ def test_pattern_worker_does_not_persist_evidence(monkeypatch):
     monkeypatch.setattr(server,'store_auto_scan',forbidden)
     server._scan_worker('kospi','fixture','krx','fake',24,'pattern')
     assert seen==[True] and server.SCAN_PROFILES['pattern']['status']=='complete' and server.SCAN_PROFILES['full']['status']=='idle'
-    assert server.SCAN_STATE['result']['elapsed_seconds']>=0
+    assert server.SCAN_PROFILES['pattern']['result']['elapsed_seconds']>=0
