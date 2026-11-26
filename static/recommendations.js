@@ -31,14 +31,6 @@
       count.hidden=true;fill.style.width=finished?'100%':'0%';
       bar.removeAttribute('aria-valuenow');bar.setAttribute('aria-valuetext',running?'시장 자료 확인 중':finished?'검색 완료':'검색 진행 전');
     }
-    const patternButton=$('patternScan'),patternStatus=$('patternStatus'),patternResults=$('patternResults');
-    if(patternButton){
-      patternButton.disabled=running||kind==='unavailable';
-      patternButton.setAttribute('aria-busy',String(running));
-      patternButton.textContent=running?(hasRealProgress?`신호패턴 분석 중 · ${Math.min(done,total)}/${total}`:'신호패턴 검색 중…'):'신호패턴 종목 검색';
-    }
-    if(patternStatus)patternStatus.textContent=(names[kind]||names.idle)+' · '+detail.textContent;
-    if(kind!=='complete'&&patternResults){patternResults.replaceChildren();shownResult='';}
     button.disabled=running||kind==='unavailable';
     button.setAttribute('aria-busy',String(running));
     button.textContent=running?(hasRealProgress?`↻ 심층 분석 중 · ${Math.min(done,total)}/${total}`:'↻ 시장자료 검색 중…'):'⌕ 전체 시장 검색 시작';
@@ -46,16 +38,13 @@
   function cell(title,value){const card=document.createElement('div');card.className='recommend-stat';const l=document.createElement('span');l.textContent=title;const v=document.createElement('strong');v.textContent=String(value);card.append(l,v);return card;}
   function render(res){
     const nums=$('recommendNumbers'), list=$('recommendResults');if(!nums||!list)return;
-    nums.replaceChildren();list.replaceChildren();nums.hidden=false;
-    const onlyPattern=res.scan_profile==='pattern';
-    if(onlyPattern){
-      nums.hidden=true;
-      const target=$('patternResults')||list;
+    if(res.scan_profile==='pattern'){
+      const target=$('patternResults');if(!target)return;
       target.replaceChildren();
-      try{if(typeof window.NOVAPatternResearch?.render!=='function')throw Error('renderer unavailable');window.NOVAPatternResearch.render(target,res);}catch{const err=document.createElement('p');err.textContent='신호패턴 연구 화면 표시 실패';target.append(err);}
-      const note=document.createElement('p');note.className='note';note.textContent='신호패턴 전용 검색 결과 · 엄격 매수 및 관심 후보는 평가하지 않았습니다. 전체 시장 검색을 별도로 실행하세요.';list.append(note);
+      try{window.NOVAPatternResearch.render(target,res);}catch{target.textContent='신호패턴 화면 표시 실패';}
       return;
     }
+    nums.replaceChildren();list.replaceChildren();nums.hidden=false;
     nums.append(cell(res.marketwide?'시장 전체 조회':'상장목록/시장 범위',res.total_market_rows!=null?`${res.total_market_rows}종목`:'제한 목록'),
       cell('1차 통과',`${res.screen_passed??0}종목`),
       cell('NOVA 심층 분석',`${res.deep_succeeded??0}/${res.deep_target??0}종목`),
@@ -87,12 +76,6 @@
     }
     if(res.selection_lanes){const p=document.createElement('p');p.className='note';p.textContent=`후보 구성: 유동성 ${res.selection_lanes['유동성']||0}개 · 거래활동 ${res.selection_lanes['거래활동']||0}개 · 수급 자료 확보 관심후보 ${res.flow_auxiliary_coverage||0}개. 수급은 매수 승인에 사용하지 않습니다.`;list.append(p);}
     if(res.scan_freshness_method){const p=document.createElement('p');p.className='note';p.textContent=`시세 신선도: ${res.scan_freshness_method} · 현재가가 아닌 기준일 스윙 연구`;list.append(p);}
-    // Independent research display; failure must not hide legacy candidates.
-    const patternList=$('patternResults');
-    try{
-      if(patternList){patternList.replaceChildren();if(typeof window.NOVAPatternResearch?.render!=='function')throw Error('renderer unavailable');window.NOVAPatternResearch.render(patternList,res);}
-      else window.NOVAPatternResearch?.render(list,res);
-    }catch{const p=document.createElement('p');p.className='note';p.textContent='신호패턴 연구 화면 표시 실패 · 기존 후보는 유지됩니다.';(patternList||list).append(p);}
     const items=Array.isArray(res.recommendations)?res.recommendations:[];
     const strictHeading=document.createElement('h3');strictHeading.textContent=`엄격 매수 후보 · ${items.length}개`;list.append(strictHeading);
     if(items.length){const ranking=document.createElement('p');ranking.className='recommend-rank-intro';ranking.textContent='엄격 매수 순위: 최근 별도 검증의 Wilson 신뢰하한 → 평균 순수익 → 검증 표본 → 손익비 순. 같은 검색 결과 안에서의 상대 순위이며 실제 상승 확률이나 매수 우선 명령이 아닙니다.';list.append(ranking);}
@@ -146,75 +129,48 @@
         p.textContent=`${x.name} (${x.symbol}): ${x.reason} [${x.reason_code||'미분류'}]${x.last_completed_bar?' · KIS 완료봉 '+x.last_completed_bar.slice(0,10):''}`;
         info.append(p);}list.append(info);}
   }
+  const jobs={full:{},pattern:{}};
+  const activeStates=['running','cancelling','finalizing'];
+  const prefix=p=>p==='full'?'recommend':'pattern';
+  const options=p=>({market:$(prefix(p)+'Market')?.value||'all',source:$(prefix(p)+'Source')?.value||'auto',depth:Number($(prefix(p)+'Depth')?.value||48),profile:p});
+  function applyState(p,d){
+    jobs[p]=d;
+    const pre=prefix(p), active=activeStates.includes(d.status), other=d.active_profile&&d.active_profile!==p;
+    const o=options(p),ready=o.source==='fsc'?d.fsc_configured:o.source==='krx'?d.krx_configured:d.fsc_configured||d.krx_configured;
+    const msg=({cancelling:'취소 처리 중',cancelled:'검색 취소 완료 · 이전 결과 유지',finalizing:'최종 결과 저장 중',failed:d.error?.message||'검색 실패',complete:'검색 완료',idle:'검색 대기'})[d.status]||d.progress?.message||'검색 중';
+    if(p==='full'){setSearchState(active?'running':d.status==='complete'?'complete':d.status==='failed'?'failed':'idle',{message:msg,progress:d.progress});status(msg);}
+    else if($('patternStatus'))$('patternStatus').textContent=msg;
+    const button=$(pre+'Scan');if(button)button.disabled=Boolean(active||other||!ready);
+    const cancel=$(pre+'Cancel');if(cancel)cancel.disabled=d.status!=='running'||!d.job_id;
+    if(d.status==='complete'&&d.result)render(d.result);
+  }
   async function fetchState(){
-    if(preview){setSearchState('unavailable',{message:'체험판에서는 검색이 실행되지 않습니다.'});status('오프라인 체험판에서는 실데이터 전체 검색을 실행하지 않습니다.',true);return;}
-    if(busy)return;
-    busy=true;
+    if(preview||busy)return;busy=true;
     try{
-      const r=await fetch('/api/recommendations/status',{headers:headers(),cache:'no-store'});
-      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:`상태 확인 실패 HTTP ${r.status}`);
-      // A previous scan can still run when controls were changed in this tab.
-      // Never claim 'idle' or enable the button while the server is scanning.
-      if(d.status==='running'){
-        if(shownResult){$('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();shownResult='';}
-        const mismatch=d.depth!==Number($('recommendDepth')?.value||48)||
-          d.market!==($('recommendMarket')?.value||'all')||
-          (d.source && $('recommendSource')?.value!=='auto'&&d.source!==$('recommendSource').value);
-        const progress=d.progress||{};
-        const suffix=mismatch?' · 현재 검색은 이전 선택값으로 실행 중입니다. 완료 후 다시 검색할 수 있습니다.':'';
-        setSearchState('running',{message:(progress.message||'국내 종목 검색 중')+suffix,progress});
-        status(`검색 진행 중 · ${progress.phase==='deep'?'종목별 심층 분석':'시장 일별 자료 확인'} · 완료 전 매수 후보가 확정되지 않습니다.`);
-        startPoll();return;
-      }
-      stopPoll();
-      const chosen=$('recommendSource')?.value||'auto';
-      const isReady=chosen==='fsc'?d.fsc_configured:chosen==='krx'?d.krx_configured:(d.fsc_configured||d.krx_configured);
-      if(!isReady){$('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();shownResult='';setSearchState('unavailable',{message:'선택한 공급원의 인증키가 필요합니다.'});status('선택한 데이터 공급원의 인증키가 없습니다. FSC_STOCK_API_KEY 또는 KRX_API_KEY를 Render에 설정하세요.',true);return;}
-      const requestedMarket=$('recommendMarket')?.value||'all';
-      const selectedSource=chosen==='auto'?(d.fsc_configured?'fsc':'krx'):chosen;
-      if((d.source&&d.source!==selectedSource)||(d.depth&&d.depth!==Number($('recommendDepth')?.value||48))||(d.market&&d.market!==requestedMarket)){
-        setSearchState('idle',{message:'선택 조건이 이전 검색과 다릅니다. 새 검색을 실행하세요.'});
-        status('이전 검색과 다른 조건을 선택했습니다. 현재 조건으로 새 검색을 실행할 수 있습니다.');return;
-      }
-      if(d.status==='failed'){
-        $('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();shownResult='';
-        const message=d.error?.message||'공급원 오류';
-        setSearchState('failed',{message});status(`검색 실패: ${message}`,true);return;
-      }
-      if(d.status==='complete'&&d.result){
-        setSearchState('complete',{message:completionMessage(d.result)});
-        status(`검색 완료 · ${d.result.data_date} 기준 · ${d.result.data_source||'일별'} · 실시간 아님`);
-        if(shownResult!==d.job_id){render(d.result);shownResult=d.job_id;}
-        return;
-      }
-      setSearchState('idle',{message:'검색 준비 완료. 버튼을 누르면 전체 시장 분석을 시작합니다.'});
-      status(`데이터 공급원 연결 준비 · ${chosen==='auto'?'금융위원회 우선 자동 선택':chosen==='fsc'?'금융위원회 T+1':'KRX 일별'} · 일별 기준 자료를 확인하세요.`);
-    }catch(e){$('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();shownResult='';setSearchState('unavailable',{message:'서버 연결 또는 인증 상태를 확인할 수 없습니다. 페이지를 새로고침해 주세요.'});status(e.message||'검색 상태 확인 실패',true);stopPoll();}
-    finally{busy=false;}
+      const states=await Promise.all(['full','pattern'].map(async p=>{
+        const r=await fetch('/api/recommendations/status?profile='+p,{headers:headers(),cache:'no-store'});
+        if(!r.ok)throw Error('검색 상태 확인 실패');return [p,await r.json()];
+      }));
+      states.forEach(([p,d])=>applyState(p,d));
+      if(states.some(([,d])=>activeStates.includes(d.status)))startPoll();else stopPoll();
+    }catch(e){status(e.message,true);}finally{busy=false;}
   }
-  function completionMessage(res){
-    const elapsed=Number.isFinite(res.elapsed_seconds)?' · 소요 '+res.elapsed_seconds+'초':'';
-    return (res.data_date||'기준일 미확인')+' · '+(res.scan_profile==='pattern'?'신호패턴 전용 · 연구 후보 '+(res.signal_pattern_research?.eligible_total??'미확인')+'개':'전체 검색 · 엄격 매수 '+(res.recommended_count??'미확인')+'개 · 관심 '+(res.interest_count??'미확인')+'개')+elapsed;
-  }
-  async function scan(profile='full'){
-    if(preview||$('recommendScan')?.disabled)return;
-    stopPoll();shownResult='';
-    $('recommendNumbers').hidden=true;$('recommendResults').replaceChildren();
-    setSearchState('running',{message:'검색 시작 요청 중… 시장별 일별 데이터를 확인합니다.',progress:{phase:'provider'}});
-    status('검색 요청을 전송했습니다. 결과가 준비될 때까지 화면에 진행 상태가 표시됩니다.');
+  async function scan(p='full'){
+    if(preview||$(prefix(p)+'Scan')?.disabled)return;
+    $(prefix(p)+'Scan').disabled=true;
     try{
-      const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({market:$('recommendMarket').value,source:$('recommendSource')?.value||'auto',depth:Number($('recommendDepth')?.value||48),profile}),cache:'no-store'});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok){const detail=d.detail;throw new Error(typeof detail==='string'?detail:(detail?.message||`검색 요청 실패 HTTP ${r.status}`));}
-      if(d.status==='complete'&&d.result){
-        setSearchState('complete',{message:`최근 ${d.result.data_date||'일별'} 검색 결과를 재사용했습니다.`});
-        status('최근 20분 이내 동일 조건의 검색 결과를 불러왔습니다. 새로운 검색이 아닙니다.');
-        render(d.result);shownResult=d.job_id;return;
-      }
-      setSearchState('running',{message:d.progress?.message||'전체 시장 검색 중…',progress:d.progress});
-      status('검색 진행 중 · 완료 전의 결과는 확정 후보가 아닙니다.');
-      startPoll();fetchState();
-    }catch(e){setSearchState('failed',{message:e.message||'검색 시작 실패'});status(e.message||'검색을 시작할 수 없습니다.',true);}
+      const r=await fetch('/api/recommendations/run',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify(options(p)),cache:'no-store'});
+      const d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:d.detail?.message||'검색 실패');
+      applyState(p,d);startPoll();await fetchState();
+    }catch(e){$(prefix(p)+'Status').textContent=e.message;await fetchState();}
+  }
+  async function cancel(p){
+    const d=jobs[p];if(!d.job_id||d.status!=='running')return;
+    $(prefix(p)+'Cancel').disabled=true;
+    try{
+      const r=await fetch('/api/recommendations/cancel',{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({profile:p,job_id:d.job_id}),cache:'no-store'});
+      const v=await r.json();if(!r.ok)throw Error(v.detail||'취소 실패');applyState(p,v);startPoll();
+    }catch(e){$(prefix(p)+'Status').textContent=e.message;await fetchState();}
   }
   async function diagnose(){
     const btn=$('recommendDiagnose'),out=$('recommendDiagnosis');
@@ -255,10 +211,11 @@
       if($('patternStatus'))$('patternStatus').textContent='검색 대기 · 신호패턴 전용 경량 분석';
     }
     const diag=$('recommendDiagnose');if(diag)diag.onclick=diagnose;
-    const refreshOptions=()=>{shownResult='';const n=$('recommendNumbers');if(n)n.hidden=true;$('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();if($('patternStatus'))$('patternStatus').textContent='선택 조건 변경 · 검색 상태 확인 중';fetchState();};
-    const source=$('recommendSource');if(source)source.onchange=refreshOptions;
-    if($('recommendDepth'))$('recommendDepth').onchange=refreshOptions;
-    $('recommendMarket').onchange=refreshOptions;
+    for(const p of ['full','pattern']){
+      const pre=prefix(p);
+      const btn=$(pre+'Cancel');if(btn)btn.onclick=()=>cancel(p);
+      for(const key of ['Source','Depth','Market'])if($(pre+key))$(pre+key).onchange=fetchState;
+    }
     document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPoll();else if(viewOpen())fetchState();});
   }
   window.NOVAScanner={onViewChange,load:fetchState};
