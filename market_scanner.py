@@ -459,7 +459,7 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
         'market':market,'markets_scanned':markets,
         'data_source_id':'fsc' if fsc else 'krx','data_lag':'T+1 영업일 오후 1시 이후' if fsc else '장 마감 이후',
         'total_market_rows':len(whole),'screen_passed':len(selected),'deep_target':len(top),
-        'deep_succeeded':0,'deep_failed':0,'recommended_count':0,'recommendations':[],
+        'deep_succeeded':0,'deep_failed':0,'scan_cache_counts':{'HIT':0,'MISS':0,'BYPASS':0},'recommended_count':0,'recommendations':[],
         'interest_candidates':[],'interest_count':0,'interest_only':False,
         'rejection_summary':{},'coverage_scope':f'1차 통과 종목 중 최대 {depth}개 · 유동성/거래활동 두 경로 심층 분석',
         'rejected':[],'rejection_codes':{},'exclusion_counts':exclusions,'scan_limit':depth,'marketwide':True,
@@ -479,6 +479,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
             detail=(analyze_asof(row['symbol'],asof) if analyze_asof else analyze(row['symbol']))
             if isinstance(detail,dict):
                 detail=dict(detail,scan_expected_asof=expected_asof)
+                state=((detail.get('scan_freshness') or {}).get('scan_cache') or {}).get('state')
+                if state in result['scan_cache_counts']:result['scan_cache_counts'][state]+=1
             result['deep_succeeded']+=1
             # Failures in the research overlay cannot change existing candidates.
             try:
