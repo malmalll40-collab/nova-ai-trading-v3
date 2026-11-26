@@ -2094,10 +2094,24 @@ def _start_v574_data_probe(version='574'):
             key,secret=_kis_creds()
             kwargs={}
             if version=='576':
+                from nova_v578_kis_telemetry import KIS_LOAD
+                from nova_v574_data_audit import ProbeError
                 def guard():
                     current=datetime.now(KST)
-                    return quiet_window(current,krx_session(current))
+                    if not quiet_window(current,krx_session(current)):return False
+                    local=KIS_LOAD.snapshot()
+                    if local['foreground_active'] or local['physical_active'] or local['research_active']:
+                        raise ProbeError('FOREGROUND_BUSY')
+                    if local['window_overflow'] or local['recent_provider_errors']:
+                        raise ProbeError('PROVIDER_UNHEALTHY')
+                    return True
+                try:
+                    if not guard():raise ProbeError('QUIET_WINDOW_ENDED')
+                except ProbeError as exc:
+                    result={'status':'SKIPPED','reason':str(exc),'strategy_adoption':'HOLD'}
+                    return
                 kwargs['budget']=GuardedBudget(guard,max_calls=MAX_CALLS,max_seconds=MAX_SECONDS)
+                kwargs['grouped']=True
             result=pilot(KIS(key,secret),now,progress=lambda stats:emit(event+'_stream',stats),**kwargs)
         except Exception:
             pass # never log provider exceptions
