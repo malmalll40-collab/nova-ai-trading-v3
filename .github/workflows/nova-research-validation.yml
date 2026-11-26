@@ -26,6 +26,15 @@ jobs:
         run: python -m compileall -q -x '/\.git/' .
       - name: Focused research tests
         run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py tests/test_v579_admission.py tests/test_v580_integrated.py tests/test_v582_signal_pattern.py tests/test_v583_pattern_replay.py tests/test_v584_pattern_scan.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate signal pattern UI
+        run: |
+          node --check static/pattern_research.js
+          node --check static/recommendations.js
+          node --check static/sw.js
+          node --test tests/test_v585_pattern_ui.cjs
       - name: Regression tests
         run: |
           python -m pytest --collect-only -q > /tmp/nova-test-collection.txt
@@ -51,7 +60,7 @@ jobs:
           print('Root archive count:', len(archives))
           assert len(archives) == 1, 'Render extraction requires exactly one root ZIP'
           tracked = set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))
-          required = {'server.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','nova_v580_integrated.py','nova_v582_signal_pattern.py','nova_v583_pattern_replay.py','nova_v584_pattern_scan.py','market_scanner.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py'}
+          required = {'server.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','nova_v580_integrated.py','nova_v582_signal_pattern.py','nova_v583_pattern_replay.py','nova_v584_pattern_scan.py','static/pattern_research.js','static/recommendations.js','static/index.html','static/sw.js','market_scanner.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py'}
           assert required <= tracked, 'Required research source not tracked'
           with zipfile.ZipFile(archives[0]) as z:
               names = set()
