@@ -1,3 +1,4 @@
+from nova_release import APP_VERSION
 from datetime import date,timedelta
 from nova_v561_hierarchical import choose,replay_panel,nonoverlap_changes,bucket,disjoint,PRESET
 
@@ -44,7 +45,7 @@ def test_scheduler_auth(monkeypatch):
     from fastapi.testclient import TestClient
     monkeypatch.delenv('NOVA_AUTOTRACK_TOKEN',raising=False);monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
     c=TestClient(server.app);assert c.post('/api/research/core561/collect').status_code==503
-    assert c.get('/healthz').json()['app_version']=='5.7.0' and not c.get('/healthz').json()['v561_live_adoption']
+    assert c.get('/healthz').json()['app_version']==APP_VERSION and not c.get('/healthz').json()['v561_live_adoption']
 
 def test_heldout_bucket_and_variable_research_cap():
     import pandas as pd
