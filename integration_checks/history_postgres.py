@@ -219,8 +219,8 @@ def main():
     from research_krx_collection import CollectorStore
     store=CollectorStore(dsn,days)
     store.setup()
-    info,saved,held=store.status()
-    assert info['stored_rows']==1 and not held
+    info,krx_saved,held=store.status()
+    assert info['stored_rows']==1 and krx_saved=={('kospi_dd_trd',d.isoformat())} and not held
     assert not store.claim('kospi_dd_trd',d)
     assert store.claim('kosdaq_dd_trd',d)
     assert not store.claim('stk_bydd_trd',d)
