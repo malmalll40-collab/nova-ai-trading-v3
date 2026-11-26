@@ -208,6 +208,14 @@ def main():
         assert krx_coverage(cur,kind,krx_id)['stored_rows']==1
     assert read_status(dsn,full_days)['stored_rows']==len(full_days)*len(SYMBOLS)
     print('KRX isolated checkpoint PASS: separate basis, immutable day, persistent coverage')
+    from research_krx_access_probe import Attempts
+    a=Attempts(dsn);b=Attempts(dsn)
+    a.initialize();b.initialize()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(lambda x:x.claim('kospi'),(a,b)))
+    assert sorted(results)==[False,True] and not b.claim('kospi')
+    assert b.claim('kosdaq') and not a.claim('kosdaq')
+    print('KRX one-shot probe ledger PASS: cross-process durable deduplication')
     print('PostgreSQL integration PASS: durable resume, idempotence, rollback, isolated rows')
 if __name__=='__main__':
     main()
