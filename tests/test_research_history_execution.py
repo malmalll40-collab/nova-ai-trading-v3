@@ -24,6 +24,7 @@ def test_pacing_and_deadline_no_extra_request():
     t=[0.];calls=[]
     client=SimpleNamespace(get=lambda *a:calls.append(t[0]))
     paced=PacedClient(client,lambda:True,clock=lambda:t[0],pause=lambda n:t.__setitem__(0,t[0]+n),deadline=10)
+    paced.bind_lock(lambda:True)
     paced.get('a','b',{})
     paced.get('a','b',{})
     with pytest.raises(ResearchBlocked,match='PASS_DEADLINE'):
@@ -34,6 +35,7 @@ def test_admission_revoked_during_wait():
     t=[0.];calls=[]
     client=SimpleNamespace(get=lambda *a:calls.append(1))
     paced=PacedClient(client,lambda:t[0]<2,clock=lambda:t[0],pause=lambda n:t.__setitem__(0,t[0]+n),deadline=20)
+    paced.bind_lock(lambda:True)
     paced.get('a','b',{})
     with pytest.raises(ResearchBlocked,match='RUN_ADMISSION_REVOKED'):
         paced.get('a','b',{})
@@ -56,3 +58,12 @@ def test_untrusted_error_sanitized():
     d=date(2026,11,25)
     stats,rows=collect(Fake(),'^KS11',d,d,(d,),Budget(),pause=lambda n:None)
     assert stats['reason']=='PROVIDER_REQUEST_FAILED' and not rows
+
+def test_lost_run_lock_blocks_before_network():
+    client=SimpleNamespace(get=lambda *a:pytest.fail('unexpected GET'))
+    paced=PacedClient(client,lambda:True,clock=lambda:0,pause=lambda n:None,deadline=20)
+    with pytest.raises(ResearchBlocked,match='RUN_ADMISSION_REVOKED'):
+        paced.get('a','b',{})
+    paced.bind_lock(lambda:False)
+    with pytest.raises(ResearchBlocked,match='RUN_ADMISSION_REVOKED'):
+        paced.get('a','b',{})
