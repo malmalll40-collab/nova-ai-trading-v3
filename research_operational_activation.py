@@ -74,6 +74,11 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
     try:
         quota=gate.status()
         emit('research_quota_probe',quota)
+        if quota.get('undispatched_research',0) and available():
+            cancelled=gate.recover_undispatched_research()
+            emit('research_undispatched_recovery',{'cancelled':cancelled,'orders_enabled':False})
+            quota=gate.status()
+            emit('research_quota_probe',quota)
         if quota['unfinished_foreground'] or quota['unfinished_research']:
             emit('research_collection_stop',{'reason':'UNFINISHED_SHARED_RESERVATION','orders_enabled':False})
             return

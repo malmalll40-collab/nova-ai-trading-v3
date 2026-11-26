@@ -9,10 +9,13 @@ NOW=datetime(2026,11,26,tzinfo=timezone.utc)
 
 class Ledger:
     def __init__(self):
-        self.claims=[];self.finished=[];self.busy=False;self.fail=False
+        self.claims=[];self.finished=[];self.busy=False;self.fail=False;self.marked=[];self.mark_ok=True
     def claim(self,kind,limit):
         self.claims.append((kind,limit))
         return None if self.busy else len(self.claims)
+    def mark_research_dispatched(self,lease):
+        self.marked.append(lease)
+        return self.mark_ok
     def finish(self,lease):
         self.finished.append(lease)
         if self.fail:raise RuntimeError('secret db detail')
@@ -68,3 +71,22 @@ def test_release_failure_is_sanitized_without_reissuing():
     with pytest.raises(ResearchBlocked,match='SHARED_QUOTA_RELEASE_UNVERIFIED') as exc:
         with t.physical():pass
     assert 'secret' not in str(exc.value) and db.claims==[('foreground',4)]
+
+def test_research_durable_marker_precedes_transport():
+    db=Ledger();t=LocalTelemetry(wall=lambda:NOW,shared_gate=SharedRequestGate(db,4))
+    with t.research_attempt(proof()):
+        assert db.marked==[1] and not db.finished
+    assert db.finished==[1]
+
+def test_cancelled_or_unverified_marker_prevents_dispatch():
+    db=Ledger();db.mark_ok=False
+    t=LocalTelemetry(wall=lambda:NOW,shared_gate=SharedRequestGate(db,4))
+    with pytest.raises(ResearchBlocked,match='SHARED_QUOTA_DISPATCH_UNVERIFIED'):
+        with t.research_attempt(proof()):pytest.fail('must not dispatch')
+    assert db.marked==[1] and not db.finished
+
+def test_ambiguous_research_transport_keeps_marked_lease():
+    db=Ledger();t=LocalTelemetry(wall=lambda:NOW,shared_gate=SharedRequestGate(db,4))
+    with pytest.raises(TimeoutError):
+        with t.research_attempt(proof()):raise TimeoutError('ambiguous')
+    assert db.marked==[1] and not db.finished

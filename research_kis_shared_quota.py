@@ -15,6 +15,7 @@ POLICY_TABLE='nova_kis_shared_policy_v1'
 LOCK_KEY=601_576_003
 BUFFER_SECONDS=1.1
 RESEARCH_RESERVE=2
+UNDISPATCHED_GRACE_SECONDS=120
 
 @dataclass(frozen=True)
 class Claim:
@@ -49,6 +50,10 @@ class SharedQuotaLedger:
                 lease_id TEXT PRIMARY KEY,
                 kind TEXT NOT NULL CHECK (kind IN ('foreground','research')),
                 finished_at TIMESTAMPTZ NULL)""")
+            # NULL claimed_at means legacy or uninstrumented foreground; never
+            # infer that a legacy reservation was not dispatched.
+            cur.execute(f'ALTER TABLE {TABLE} ADD COLUMN IF NOT EXISTS research_claimed_at TIMESTAMPTZ NULL')
+            cur.execute(f'ALTER TABLE {TABLE} ADD COLUMN IF NOT EXISTS research_dispatched_at TIMESTAMPTZ NULL')
 
     @staticmethod
     def _check_policy(cur,limit):
@@ -76,8 +81,39 @@ class SharedQuotaLedger:
             if kind=='research' and (foreground or research or limit-used<=RESEARCH_RESERVE):
                 return None
             lease=Claim(uuid4().hex,kind)
-            cur.execute(f'INSERT INTO {TABLE}(lease_id,kind) VALUES (%s,%s)',(lease.lease_id,kind))
+            if kind=='research':
+                cur.execute(f'INSERT INTO {TABLE}(lease_id,kind,research_claimed_at) VALUES (%s,%s,clock_timestamp())',(lease.lease_id,kind))
+            else:
+                cur.execute(f'INSERT INTO {TABLE}(lease_id,kind) VALUES (%s,%s)',(lease.lease_id,kind))
             return lease
+
+    def mark_research_dispatched(self,lease):
+        """Durable compare-and-set BEFORE physical I/O, never after.
+        A cancelled or unknown legacy claim cannot be dispatched.
+        """
+        if not isinstance(lease,Claim) or lease.kind!='research':
+            raise ValueError('INVALID_RESEARCH_LEASE')
+        with self._tx() as cur:
+            cur.execute(f"""UPDATE {TABLE} SET research_dispatched_at=clock_timestamp()
+                WHERE lease_id=%s AND kind='research' AND finished_at IS NULL
+                AND research_claimed_at IS NOT NULL AND research_dispatched_at IS NULL""",(lease.lease_id,))
+            return cur.rowcount==1
+
+    def recover_undispatched_research(self,limit):
+        """Cancel only instrumented claims proven not to have passed dispatch.
+        Same advisory transaction serializes dispatch and cancellation. If
+        cancellation wins, subsequent mark_research_dispatched must fail.
+        Age is a grace period, NOT evidence of provider completion. Legacy and
+        dispatched rows remain held, even if very old.
+        """
+        with self._tx() as cur:
+            self._check_policy(cur,limit)
+            cur.execute(f"""UPDATE {TABLE} SET finished_at=clock_timestamp()
+                WHERE kind='research' AND finished_at IS NULL
+                AND research_claimed_at IS NOT NULL AND research_dispatched_at IS NULL
+                AND research_claimed_at <= clock_timestamp() - (%s * interval '1 second')""",
+                (UNDISPATCHED_GRACE_SECONDS,))
+            return cur.rowcount
 
     def status(self,limit):
         """Read-only counts; never clears an uncertain lease."""
@@ -85,11 +121,16 @@ class SharedQuotaLedger:
             self._check_policy(cur,limit)
             cur.execute(f"""SELECT count(*) FILTER (WHERE kind='foreground' AND finished_at IS NULL),
                 count(*) FILTER (WHERE kind='research' AND finished_at IS NULL),
-                count(*) FILTER (WHERE finished_at IS NOT NULL AND finished_at > clock_timestamp() - (%s * interval '1 second'))
+                count(*) FILTER (WHERE finished_at IS NOT NULL AND finished_at > clock_timestamp() - (%s * interval '1 second')),
+                count(*) FILTER (WHERE kind='research' AND finished_at IS NULL AND research_claimed_at IS NULL),
+                count(*) FILTER (WHERE kind='research' AND finished_at IS NULL AND research_claimed_at IS NOT NULL AND research_dispatched_at IS NULL),
+                count(*) FILTER (WHERE kind='research' AND finished_at IS NULL AND research_dispatched_at IS NOT NULL)
                 FROM {TABLE}""",(BUFFER_SECONDS,))
-            foreground,research,buffered=cur.fetchone()
+            foreground,research,buffered,legacy,undispatched,dispatched=cur.fetchone()
             return {'unfinished_foreground':foreground,'unfinished_research':research,
-                    'completion_buffered':buffered,'policy_cap':limit}
+                    'completion_buffered':buffered,'policy_cap':limit,
+                    'legacy_unknown_research':legacy,'undispatched_research':undispatched,
+                    'dispatched_unconfirmed_research':dispatched}
 
     def finish(self,lease):
         """Idempotence: repeated finish cannot shorten the safety buffer."""

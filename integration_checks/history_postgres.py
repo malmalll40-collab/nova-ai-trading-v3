@@ -56,6 +56,29 @@ def main():
     assert ledger.finish(abandoned)
     assert ledger.status(4)['unfinished_foreground']==0
     print('Shared quota ledger PASS: cross-connection cap, foreground priority, completion buffer, abandoned lease blocking')
+    # Use disposable CI DB only: emulate one historical, one dispatched and
+    # one old pre-dispatch reservation. No provider traffic.
+    from research_kis_shared_quota import TABLE as QUOTA_TABLE,UNDISPATCHED_GRACE_SECONDS
+    from research_kis_shared_quota import Claim
+    time.sleep(BUFFER_SECONDS+0.2)
+    old=ledger.claim('research',4)
+    assert old and ledger.mark_research_dispatched(old)
+    assert not peer.mark_research_dispatched(old)
+    with psycopg.connect(dsn) as fixture:
+        with fixture.cursor() as cur:
+            cur.execute(f"UPDATE {QUOTA_TABLE} SET research_claimed_at=clock_timestamp() - interval '1 hour' WHERE lease_id=%s",(old.lease_id,))
+            cur.execute(f"INSERT INTO {QUOTA_TABLE}(lease_id,kind) VALUES ('ci-legacy','research')")
+            cur.execute(f"INSERT INTO {QUOTA_TABLE}(lease_id,kind,research_claimed_at) VALUES ('ci-undispatched','research',clock_timestamp() - (%s * interval '1 second'))",(UNDISPATCHED_GRACE_SECONDS+1,))
+    status=ledger.status(4)
+    assert status['legacy_unknown_research']==1 and status['dispatched_unconfirmed_research']==1 and status['undispatched_research']==1
+    assert peer.recover_undispatched_research(4)==1
+    assert not ledger.mark_research_dispatched(Claim('ci-undispatched','research'))
+    assert not ledger.mark_research_dispatched(Claim('ci-legacy','research'))
+    assert peer.recover_undispatched_research(4)==0
+    status=peer.status(4)
+    assert status['unfinished_research']==2 and status['legacy_unknown_research']==1 and status['dispatched_unconfirmed_research']==1
+    assert ledger.claim('research',4) is None
+    print('Research lease lifecycle PASS: durable dispatch, CAS cancellation, legacy and dispatched reservations retained')
     tx=transaction_factory(dsn)
     days=tuple(date(2026,11,23)+timedelta(days=i) for i in range(3))
     symbol=SYMBOLS[0]
