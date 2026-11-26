@@ -55,6 +55,7 @@
     const m=(res.markets_scanned||[]).map(x=>x==='kospi'?'코스피':x==='kosdaq'?'코스닥':'국내 시장').join(' + ');
     pre.textContent=`${res.data_source||'일별 자료'} · 기준일 ${res.data_date||'미확인'} · ${m}\n${res.coverage_scope||'일별 스냅샷 기반 제한 분석'} · 1차 ${res.screen_passed??0}개 → ${res.deep_target??0}개 심층 검증 · 실패 ${res.deep_failed||0}개. 실시간 추천이 아닙니다.`;
     list.appendChild(pre);
+    if(res.scan_cache_counts){const p=document.createElement('p');p.className='note';p.textContent=`검증 완료봉 재사용 ${res.scan_cache_counts.HIT??0}개 · 새 조회 ${res.scan_cache_counts.MISS??0}개 · 재사용 제외 ${res.scan_cache_counts.BYPASS??0}개 (최대 5분, 매수 판단 재계산)`;list.append(p);}
     if(res.marketwide && res.rejection_codes){
       const groups=[
         ['시세·날짜 확인', ['PRICE_STALE','SNAPSHOT_DATE_LAG','ASOF_MISMATCH','BAR_NOT_CURRENT']],
