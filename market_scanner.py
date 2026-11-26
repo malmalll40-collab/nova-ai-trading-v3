@@ -164,8 +164,6 @@ def select_deep_candidates(selected: list[dict], depth: int = MAX_DEEP) -> list[
     lane claims to measure multi-day EMA/relative volume from one-day data.
     No BUY rules or suitability probabilities are changed here.
     """
-    if type(pattern_only) is not bool or (pattern_only and analyze_asof is None):
-        raise MarketScanError('invalid_profile','신호패턴 검색은 기준일 분석이 필요합니다.')
     if type(depth) is not int or depth not in DEEP_OPTIONS:
         raise ValueError('심층 분석 수는 24/48/60 중에서 선택하세요.')
     main=selected[:(depth+1)//2]
@@ -387,6 +385,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
                     client:KRXClient|None=None, depth: int = MAX_DEEP,
                     auxiliary_flow:Callable[[str],dict|None]|None=None, pattern_only:bool=False):
     """Run complete KRX universe snapshot and explicit limited deep investigation."""
+    if type(pattern_only) is not bool or (pattern_only and analyze_asof is None):
+        raise MarketScanError('invalid_profile','신호패턴 검색은 기준일 분석이 필요합니다.')
     if type(depth) is not int or depth not in DEEP_OPTIONS:
         raise MarketScanError('invalid_depth','심층 분석 수는 24/48/60 중에서 선택하세요.')
     if market not in ('all','kospi','kosdaq'):
