@@ -330,7 +330,7 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         market=demo_data(mode)
     elif source in ('auto','kis'):
         key,secret=_kis_creds()
-        market=kis_data(symbol,mode,key,secret)
+        market=kis_data(symbol,mode,key,secret,scan_asof=asof_date) if scan_profile is not None else kis_data(symbol,mode,key,secret)
         resolved_source='kis'
     else:
         raise ValueError('KIS 전용 분석입니다. Yahoo는 수동 비교 진단에서만 사용합니다.')
@@ -339,6 +339,13 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         # Compare actual provider sessions BEFORE removing future bars. Historical
         # publication lag must never be mistaken for today's live-price freshness.
         scan_freshness=assess_scan_sessions(market.bars.index,asof_date)
+        report=getattr(market,'daily_integrity',None) or {}
+        if scan_profile is not None and report.get('scan_asof')==asof_date:
+            raw=report.get('raw_scan_freshness')
+            if isinstance(raw,dict):scan_freshness=dict(raw)
+            else:scan_freshness=dict(scan_freshness,stale=True,state='RAW_COVERAGE_MISSING')
+            if report.get('signal_hold') or not report.get('verified'):
+                scan_freshness=dict(scan_freshness,stale=True,state=report.get('state','INTEGRITY_UNVERIFIED'),reason=report.get('reason','기준일 봉 검증 실패'))
         # FSC T+1 / KRX snapshot alignment. Recompute ALL indicators, backtests
         # and signals after dropping future bars; don't just relabel a current signal.
         if mode!='스윙' or source not in ('kis','auto') or not re.fullmatch(r'\d{8}',asof_date):

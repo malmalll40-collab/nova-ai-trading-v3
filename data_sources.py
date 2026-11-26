@@ -383,14 +383,18 @@ def kis_ohlc(rows:list[dict],mode:str)->pd.DataFrame:
     return clean_bars(d)
 
 
-def kis_data(ticker:str, mode:str, key:str,secret:str)->MarketData:
+def kis_data(ticker:str, mode:str, key:str,secret:str,*,scan_asof:str|None=None)->MarketData:
     normalized=ticker_format(ticker)
     if not re.fullmatch(r'\d{6}\.(KS|KQ)',normalized):
         raise ValueError('KIS 국내주식은 6자리 종목코드를 입력하세요. 예: 005930')
     code=normalized[:6]
     api=KIS(key,secret)
     now=datetime.now(KST)
-    quote,quote_stamp=api.quote(code)
+    if scan_asof is not None:
+        if mode!='스윙' or not re.fullmatch(r'\d{8}',scan_asof):raise ValueError('INVALID_SCAN_ASOF')
+        quote,quote_stamp=None,''  # Historical scan never uses today's quote.
+    else:
+        quote,quote_stamp=api.quote(code)
     if mode=='스윙': bars=api.daily(code,now)
     else:
         bars=api.minutes(code,now,sessions=6 if mode=='15분' else 3)
@@ -399,7 +403,20 @@ def kis_data(ticker:str, mode:str, key:str,secret:str)->MarketData:
     integrity=None
     if mode=='스윙':
         from daily_settlement_guard import verify_latest_kis_daily
-        bars,integrity=verify_latest_kis_daily(bars,api=api,code=code,symbol=normalized,now=now)
+        if scan_asof is not None:
+            from scan_freshness import assess_scan_sessions
+            coverage=assess_scan_sessions(bars.index,scan_asof,now=now)
+            cutoff=datetime.strptime(scan_asof,'%Y%m%d').date()
+            # Keep raw coverage evidence before truncation; do not let a later unsettled bar veto yesterday.
+            bars=bars.loc[[pd.Timestamp(t).date()<=cutoff for t in bars.index]].copy()
+            if bars.empty or pd.Timestamp(bars.index[-1]).date()!=cutoff:
+                raise RuntimeError('SCAN_ASOF_BAR_MISSING')
+            bars,integrity=verify_latest_kis_daily(bars,api=api,code=code,symbol=normalized,now=now)
+            integrity=dict(integrity or {},scan_asof=scan_asof,raw_scan_freshness=coverage)
+            if integrity.get('verified') is not True or integrity.get('regular_volume_verified') is not True or integrity.get('latest_date')!=cutoff.isoformat():
+                integrity['signal_hold']=True
+        else:
+            bars,integrity=verify_latest_kis_daily(bars,api=api,code=code,symbol=normalized,now=now)
     bars=discard_unfinished(bars,mode,normalized,datetime.now(timezone.utc))
     if len(bars)<65:
         if integrity and integrity.get('signal_hold'):

@@ -516,11 +516,12 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
 
                 if interest:
                     result['interest_candidates'].append(interest)
-        except Exception:
+        except Exception as exc:
             result['deep_failed']+=1
+            code='ASOF_MISMATCH' if str(exc)=='SCAN_ASOF_BAR_MISSING' else 'DEEP_ANALYSIS_ERROR'
             result['rejected'].append({'symbol':row['symbol'],'name':row['name'],
-                'reason_code':'DEEP_ANALYSIS_ERROR',
-                'reason':'심층 시세·재무 조회에 실패했습니다 (인증·공급원·요청 제한 가능).'})
+                'reason_code':code,
+                'reason':'공식 기준일 봉이 없습니다.' if code=='ASOF_MISMATCH' else '심층 시세·재무 조회에 실패했습니다 (인증·공급원·요청 제한 가능).'})
     checkpoint()
     # Rank AFTER every deep candidate was evaluated. A discovery-order list
     # would mislead users and truncating before ranking could hide better cards.

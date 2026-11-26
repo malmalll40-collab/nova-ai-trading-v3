@@ -16,7 +16,7 @@ def fixture(monkeypatch, gate='PASS', stale=False):
     market.daily_integrity={'signal_hold':stale}
     market.bars.index=pd.bdate_range(end='2026-11-25',periods=len(market.bars))
     monkeypatch.setattr(server,'_kis_creds',lambda:('fake','fake'))
-    monkeypatch.setattr(server,'kis_data',lambda *a:deepcopy(market))
+    monkeypatch.setattr(server,'kis_data',lambda *a,**kw:deepcopy(market))
     monkeypatch.setattr(server,'assess_scan_sessions',lambda *a:{'stale':False,'reason':'fixture'})
     monkeypatch.setattr(server,'_get_financial_state',lambda *a:(gate,'fixture',2025))
     monkeypatch.setattr(server,'build_shadow_inputs',lambda *a,**k:{'benchmark':None,'sector':None,'flows':None,'diagnostics':{}})
