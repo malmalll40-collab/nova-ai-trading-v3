@@ -12,6 +12,17 @@ from datetime import datetime
 
 def main():
     dsn=os.environ['NOVA_TEST_POSTGRES_DSN']
+    from research_db_session_probe import verify_session,PROBE_LOCK
+    verified=verify_session(dsn)
+    assert verified['direct_connection_status']=='READ_OK' and verified['session_probe_verified'] is True
+    assert verified['execution_authorized'] is False and verified['session_mode_confirmed'] is False
+    with psycopg.connect(dsn,autocommit=True) as check:
+        with check.cursor() as cur:
+            cur.execute('SELECT pg_try_advisory_lock(%s)',(PROBE_LOCK,))
+            assert cur.fetchone()==(True,)
+            cur.execute('SELECT pg_advisory_unlock(%s)',(PROBE_LOCK,))
+            assert cur.fetchone()==(True,)
+    print('Direct session probe PASS: lock survived read-only commit and was released')
     tx=transaction_factory(dsn)
     days=tuple(date(2026,11,23)+timedelta(days=i) for i in range(3))
     symbol=SYMBOLS[0]
