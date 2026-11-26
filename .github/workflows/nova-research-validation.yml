@@ -25,7 +25,7 @@ jobs:
       - name: Compile sources
         run: python -m compileall -q -x '/\.git/' .
       - name: Focused research tests
-        run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py tests/test_v579_admission.py tests/test_v580_integrated.py tests/test_v582_signal_pattern.py tests/test_v583_pattern_replay.py tests/test_v584_pattern_scan.py tests/test_v586_release.py tests/test_v588_scan_efficiency.py tests/test_v589_independent_scans.py tests/test_v590_poll_isolation.py tests/test_v591_queue_diagnostics.py tests/test_v592_asof_integrity.py tests/test_v593_scan_cache.py tests/test_v600_workspace.py tests/test_ops_preflight.py tests/test_research_history_checkpoint.py tests/test_research_history_resume.py
+        run: python -m pytest -vv --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket tests/test_v571_policy.py tests/test_v572_calibration.py tests/test_v573_ml.py tests/test_v574_data_audit.py tests/test_v575_calendar_coverage.py tests/test_cache_key_deadlock.py tests/test_v576_expanded_coverage.py tests/test_v577_split_coverage.py tests/test_v578_kis_telemetry.py tests/test_v579_admission.py tests/test_v580_integrated.py tests/test_v582_signal_pattern.py tests/test_v583_pattern_replay.py tests/test_v584_pattern_scan.py tests/test_v586_release.py tests/test_v588_scan_efficiency.py tests/test_v589_independent_scans.py tests/test_v590_poll_isolation.py tests/test_v591_queue_diagnostics.py tests/test_v592_asof_integrity.py tests/test_v593_scan_cache.py tests/test_v600_workspace.py tests/test_ops_preflight.py tests/test_research_history_checkpoint.py tests/test_research_history_resume.py tests/test_research_history_status.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -49,9 +49,9 @@ jobs:
           import xml.etree.ElementTree as ET
           root = ET.parse('/tmp/nova-regression.xml').getroot()
           cases = list(root.iter('testcase'))
-          assert len(cases) == 935, f'Expected 935 cases, got {len(cases)}'
+          assert len(cases) == 939, f'Expected 939 cases, got {len(cases)}'
           assert not any(c.find(k) is not None for c in cases for k in ('failure','error','skipped'))
-          print('All 935 regression cases passed without skips')
+          print('All 939 regression cases passed without skips')
           PY
       - name: Verify Render archive overlay
         if: always()
@@ -63,7 +63,7 @@ jobs:
           print('Root archive count:', len(archives))
           assert len(archives) == 1, 'Render extraction requires exactly one root ZIP'
           tracked = set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))
-          required = {'server.py','nova_release.py','nova_v588_scan_projection.py','nova_v593_scan_cache.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','nova_v580_integrated.py','nova_v582_signal_pattern.py','nova_v583_pattern_replay.py','nova_v584_pattern_scan.py','static/pattern_research.js','static/recommendations.js','static/candles.js','static/index.html','static/sw.js','market_scanner.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py','ops_preflight.py','research_history_checkpoint.py','research_history_resume.py','research_history_postgres.py','research_history_run_control.py','integration_checks/history_postgres.py'}
+          required = {'server.py','nova_release.py','nova_v588_scan_projection.py','nova_v593_scan_cache.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','nova_v580_integrated.py','nova_v582_signal_pattern.py','nova_v583_pattern_replay.py','nova_v584_pattern_scan.py','static/pattern_research.js','static/recommendations.js','static/candles.js','static/index.html','static/sw.js','market_scanner.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py','ops_preflight.py','research_history_checkpoint.py','research_history_resume.py','research_history_postgres.py','research_history_run_control.py','research_history_status.py','integration_checks/history_postgres.py'}
           assert required <= tracked, 'Required research source not tracked'
           with zipfile.ZipFile(archives[0]) as z:
               names = set()

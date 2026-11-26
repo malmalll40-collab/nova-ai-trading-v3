@@ -2286,6 +2286,11 @@ def _ops_startup():
         try:emit('checkpoint_probe',checkpoint_probe())
         except Exception:pass
         try:
+            from research_history_status import probe as history_status_probe
+            emit('research_history_status',history_status_probe(os.getenv('DATABASE_URL','').strip()))
+        except Exception:
+            emit('research_history_status',{'status':'UNAVAILABLE','execution_authorized':False,'strategy_adoption':'HOLD'})
+        try:
             from collection_gate import inspect_gate
             from ops_diagnostics import database_probe
             now=datetime.now(KST)
