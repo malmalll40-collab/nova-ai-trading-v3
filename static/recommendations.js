@@ -81,7 +81,7 @@
     // Independent research display; failure must not hide legacy candidates.
     const patternList=$('patternResults');
     try{
-      if(patternList){patternList.replaceChildren();window.NOVAPatternResearch?.render(patternList,res);}
+      if(patternList){patternList.replaceChildren();if(typeof window.NOVAPatternResearch?.render!=='function')throw Error('renderer unavailable');window.NOVAPatternResearch.render(patternList,res);}
       else window.NOVAPatternResearch?.render(list,res);
     }catch{const p=document.createElement('p');p.className='note';p.textContent='신호패턴 연구 화면 표시 실패 · 기존 후보는 유지됩니다.';(patternList||list).append(p);}
     const items=Array.isArray(res.recommendations)?res.recommendations:[];
@@ -235,13 +235,12 @@
   function init(){
     if(!$('recommendScan'))return;
     $('recommendScan').onclick=scan;
-    const toggle=$('patternMenuToggle'),body=$('patternMenuBody'),patternButton=$('patternScan');
-    if(toggle&&body)toggle.onclick=()=>{
-      body.hidden=!body.hidden;
-      toggle.setAttribute('aria-expanded',String(!body.hidden));
-      toggle.textContent=body.hidden?'신호패턴 전용 메뉴 열기':'신호패턴 전용 메뉴 닫기';
-    };
-    if(patternButton)patternButton.onclick=scan;
+    const patternButton=$('patternScan');
+    if(patternButton){
+      patternButton.onclick=scan;
+      patternButton.disabled=$('recommendScan').disabled;
+      if($('patternStatus'))$('patternStatus').textContent='검색 대기 · 기존 전체 시장 검색과 결과를 공유합니다.';
+    }
     const diag=$('recommendDiagnose');if(diag)diag.onclick=diagnose;
     const refreshOptions=()=>{shownResult='';const n=$('recommendNumbers');if(n)n.hidden=true;$('recommendResults').replaceChildren();$('patternResults')?.replaceChildren();if($('patternStatus'))$('patternStatus').textContent='선택 조건 변경 · 검색 상태 확인 중';fetchState();};
     const source=$('recommendSource');if(source)source.onchange=refreshOptions;
@@ -250,5 +249,5 @@
     document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPoll();else if(viewOpen())fetchState();});
   }
   window.NOVAScanner={onViewChange,load:fetchState};
-  window.addEventListener('DOMContentLoaded',init);
+  if(document.readyState==='loading'||!document.readyState)window.addEventListener('DOMContentLoaded',init);else init();
 })();
