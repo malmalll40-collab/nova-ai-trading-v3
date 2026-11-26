@@ -2309,6 +2309,11 @@ def _ops_startup():
             emit('v570_validation_probe',{k:p.get(k) for k in ('status','stored_records','verified_records','observed_days','completed','pending','missing_outcomes','shadow_frozen','shadow_completed','validation_state','strategy_adoption')})
         except Exception:
             emit('v570_validation_probe',{'status':'UNAVAILABLE','strategy_adoption':'HOLD'})
+        try:
+            from research_db_session_probe import probe as direct_session_probe
+            emit('research_db_session_probe',direct_session_probe(os.getenv('DATABASE_URL','').strip()))
+        except Exception:
+            emit('research_db_session_probe',{'direct_connection_status':'UNAVAILABLE','session_probe_verified':False,'session_mode_confirmed':False,'execution_authorized':False})
     threading.Thread(target=probe,daemon=True,name='nova-checkpoint-probe').start()
     if os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='1':_start_ops(True)
     elif os.getenv('NOVA_OPS_DIAGNOSTICS_ON_START')=='574':_start_v574_data_probe()
