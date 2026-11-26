@@ -6,7 +6,6 @@ connection, never a transaction-pooling connection.
 """
 from contextlib import contextmanager
 from urllib.parse import urlsplit
-from datetime import date
 from research_history_checkpoint import TABLE, DATASETS, manifest, saved
 from nova_v576_expanded_coverage import SYMBOLS
 from nova_v574_data_audit import INDEX_CODES
@@ -80,16 +79,20 @@ def read_status(dsn,sessions,*,connect=None):
                         'zero_volume':None if symbol in INDEX_CODES else sum(r['volume']==0 for r in data.values()),
                         'missing_turnover':None if symbol in INDEX_CODES else sum(r['turnover'] is None for r in data.values())})
                 rows=sum(s['stored_rows'] for s in streams)
+                cur.execute(f'SELECT COUNT(*) FROM {TABLE} WHERE dataset=%s',(dataset,))
+                if cur.fetchone()!=(rows,):
+                    raise ValueError('UNEXPECTED_STREAM_ROWS')
                 complete=sum(s['missing_rows']==0 for s in streams)
                 return {**base,'status':'COVERAGE_COMPLETE' if complete==len(SYMBOLS) else 'PARTIAL',
                         'stored_rows':rows,'complete_streams':complete,'streams':streams}
     except Exception:
         return {**base,'status':'UNAVAILABLE','reason':'READ_OR_INTEGRITY_FAILED'}
 
-def run_exclusive(dsn,api,sessions,*,transaction,now,calendar,admission,
+def run_exclusive(dsn,api,sessions,*,now,calendar,admission,
                   session_mode_confirmed=False,connect=None,**limits):
     """Lock only coordinates research runs in the same database; not quota proof."""
     from research_history_resume import resume
+    from research_history_postgres import transaction_factory
     blocked={'status':'BLOCKED','reason':'RUN_LOCK_OR_ADMISSION_UNVERIFIED',
              'new_rows':0,'logical_calls':0,'training_ready':False,
              'strategy_adoption':'HOLD','orders_enabled':False}
@@ -99,7 +102,7 @@ def run_exclusive(dsn,api,sessions,*,transaction,now,calendar,admission,
         with exclusive_run(dsn,session_mode_confirmed=session_mode_confirmed,connect=connect) as alive:
             if alive is None:
                 return {**blocked,'reason':'DUPLICATE_RUN'}
-            return resume(api,sessions,transaction=transaction,now=now,calendar=calendar,
+            return resume(api,sessions,transaction=transaction_factory(dsn,connect=connect),now=now,calendar=calendar,
                           admission=lambda:alive() and admission() is True,**limits)
     except Exception:
         return {**blocked,'reason':'RUN_COORDINATION_FAILED'}
