@@ -8,11 +8,11 @@ function harness(){
     if(!nodes.has(id))nodes.set(id,{id,hidden:false,disabled:id==='patternScan',value:id.endsWith('Depth')?'48':id.endsWith('Market')?'all':'auto',textContent:'',dataset:{},style:{},attrs:{},children:[],classList:{toggle(){}},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},replaceChildren(){this.children=[];},append(...x){this.children.push(...x);},appendChild(x){this.append(x);}});
     return nodes.get(id);
   };
-  const idle={status:'idle',fsc_configured:true};let states={full:idle,pattern:idle};
+  const idle={status:'idle',fsc_configured:true};let states={full:idle,pattern:idle},networkFailure=false;
   const window={addEventListener:(k,cb)=>handlers[k]=cb,NOVAConnect:{currentView:()=> 'recommendations'},NOVAPatternResearch:{render:(target,res)=>target.append(res.signal_pattern_research)}};
-  vm.runInNewContext(fs.readFileSync('static/recommendations.js','utf8'),{window,document:{getElementById:el,createElement:el,addEventListener(){},hidden:false},sessionStorage:{getItem(){return null;}},setInterval(){return 1;},clearInterval(){},fetch:async(url,options)=>{requests.push({url,options});const p=url.includes('?profile=')?url.split('=')[1]:JSON.parse(options?.body||'{}').profile||'full';return {ok:true,json:async()=>states[p]};},Intl});
+  vm.runInNewContext(fs.readFileSync('static/recommendations.js','utf8'),{window,document:{getElementById:el,createElement:el,addEventListener(){},hidden:false},sessionStorage:{getItem(){return null;}},setInterval(){return 1;},clearInterval(){},fetch:async(url,options)=>{requests.push({url,options});if(networkFailure)throw Error('offline');const p=url.includes('?profile=')?url.split('=')[1]:JSON.parse(options?.body||'{}').profile||'full';return {ok:true,json:async()=>states[p]};},Intl});
   handlers.DOMContentLoaded();
-  return {el,window,requests,setResponse:(p,x)=>states[p]=x};
+  return {el,window,requests,setResponse:(p,x)=>states[p]=x,setNetworkFailure:x=>networkFailure=x};
 }
 test('pattern controls are always visible before search and initialize without network traffic',()=>{
   const html=fs.readFileSync('static/index.html','utf8');
@@ -107,4 +107,26 @@ test('independent completed results coexist, and options clear only their own re
   assert.equal(h.el('patternResults').children.length,0);
   assert.equal(h.el('recommendNumbers').hidden,false);
   assert.ok(h.el('patternStatus').textContent.includes('이전 검색 조건'));
+});
+
+test('network failure clears both previous result lists and disables unsafe controls until recovery',async()=>{
+  const h=harness();
+  const done={status:'complete',fsc_configured:true,source:'fsc',depth:48,market:'all',job_id:'x'};
+  h.setResponse('full',{...done,result:{scan_profile:'full',data_date:'20261125',recommendations:[],interest_candidates:[]}});
+  h.setResponse('pattern',{...done,result:{scan_profile:'pattern',data_date:'20261125',signal_pattern_research:{eligible_total:2}}});
+  await h.window.NOVAScanner.load();
+  assert.ok(h.el('recommendResults').children.length>0);
+  assert.equal(h.el('patternResults').children.length,1);
+  h.setNetworkFailure(true);
+  await h.window.NOVAScanner.load();
+  assert.equal(h.el('recommendResults').children.length,0);
+  assert.equal(h.el('patternResults').children.length,0);
+  assert.equal(h.el('recommendNumbers').hidden,true);
+  for(const id of ['recommendScan','patternScan','recommendCancel','patternCancel'])assert.equal(h.el(id).disabled,true);
+  assert.ok(h.el('patternStatus').textContent.includes('검색 상태 확인 실패'));
+  h.setNetworkFailure(false);
+  await h.window.NOVAScanner.load();
+  assert.equal(h.el('recommendScan').disabled,false);
+  assert.equal(h.el('patternScan').disabled,false);
+  assert.equal(h.el('patternResults').children.length,1);
 });
