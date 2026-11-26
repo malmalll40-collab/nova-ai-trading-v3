@@ -5,6 +5,7 @@ import psycopg
 from research_history_checkpoint import initialize,append,saved,missing_windows,TABLE
 from research_history_postgres import transaction_factory
 from research_history_resume import resume
+from research_history_run_control import exclusive_run, read_status, run_exclusive
 from nova_v576_expanded_coverage import SYMBOLS
 from nova_v574_data_audit import KST
 from datetime import datetime
@@ -14,6 +15,16 @@ def main():
     tx=transaction_factory(dsn)
     days=tuple(date(2026,11,23)+timedelta(days=i) for i in range(3))
     symbol=SYMBOLS[0]
+    assert read_status(dsn,days)['status']=='NOT_INITIALIZED'
+    with exclusive_run(dsn,session_mode_confirmed=True) as alive:
+        assert alive is not None and alive()
+        with exclusive_run(dsn,session_mode_confirmed=True) as duplicate:
+            assert duplicate is None
+        blocked=run_exclusive(dsn,None,days,now=lambda:None,calendar=lambda t:{},admission=lambda:True,session_mode_confirmed=True)
+        assert blocked['reason']=='DUPLICATE_RUN' and blocked['logical_calls']==0
+    with exclusive_run(dsn,session_mode_confirmed=True) as alive:
+        assert alive is not None and alive()
+    assert run_exclusive(dsn,None,days,now=lambda:None,calendar=lambda t:{},admission=lambda:False)['status']=='BLOCKED'
     with tx() as (cur,kind):
         dataset=initialize(cur,kind,days)
         assert append(cur,kind,dataset,symbol,{days[1]:{'close':100}})==1
@@ -52,6 +63,13 @@ def main():
         assert len(saved(cur,kind,dataset,symbol))==3
         cur.execute(f'SELECT COUNT(*) FROM {TABLE}')
         assert cur.fetchone()[0]==3
+    status=read_status(dsn,days)
+    assert status['stored_rows']==3 and status['complete_streams']==1
+    assert status['expected_rows']==3*len(SYMBOLS) and status['training_ready'] is False
+    assert status['status']=='PARTIAL' and status['execution_authorized'] is False
+    with tx() as (cur,kind):
+        cur.execute(f'UPDATE {TABLE} SET digest=%s WHERE dataset=%s AND symbol=%s',('bad',dataset,symbol))
+    assert read_status(dsn,days)['status']=='UNAVAILABLE'
     print('PostgreSQL integration PASS: durable resume, idempotence, rollback, isolated rows')
 if __name__=='__main__':
     main()
