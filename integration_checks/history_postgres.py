@@ -195,6 +195,19 @@ def main():
         assert append(cur,kind,bulk_id,SYMBOLS[0],rows)==0
         assert saved(cur,kind,bulk_id,SYMBOLS[0])==rows
     print('Bulk checkpoint PASS: 729 rows, idempotent verification')
+    from research_krx_snapshot import initialize as krx_initialize, import_snapshot as krx_import, coverage as krx_coverage
+    d=days[0]
+    snapshot={'OutBlock_1':[{'BAS_DD':d.strftime('%Y%m%d'),'IDX_NM':'코스피','CLSPRC_IDX':'2500.25'}]}
+    with tx() as (cur,kind):
+        krx_id=krx_initialize(cur,kind,days)
+        assert krx_id!=dataset
+        assert krx_import(cur,kind,krx_id,'kospi_dd_trd',d,snapshot,authorized=lambda s,t:True)==1
+        assert krx_import(cur,kind,krx_id,'kospi_dd_trd',d,snapshot,authorized=lambda s,t:True)==0
+        assert krx_coverage(cur,kind,krx_id)['stored_rows']==1
+    with tx() as (cur,kind):
+        assert krx_coverage(cur,kind,krx_id)['stored_rows']==1
+    assert read_status(dsn,full_days)['stored_rows']==len(full_days)*len(SYMBOLS)
+    print('KRX isolated checkpoint PASS: separate basis, immutable day, persistent coverage')
     print('PostgreSQL integration PASS: durable resume, idempotence, rollback, isolated rows')
 if __name__=='__main__':
     main()
