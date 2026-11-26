@@ -426,6 +426,15 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         candle_research = {'version':'4.7.4','status':'ERROR','research_only':True,
             'modifies_live_signal':False,'reason':'캔들별 연구 계산 실패 · 기존 분석 신호는 유지됩니다.',
             'observations':[],'role_statistics':[]}
+    # Separate as-of pattern overlay: reuse existing completed features only.
+    signal_pattern_research=None
+    if asof_date is not None:
+        try:
+            from nova_v584_pattern_scan import from_features
+            signal_pattern_research=from_features(f,cfg,asof=asof_date,source=resolved_source,
+                stale=stale,demo=market.synthetic,financial_gate=fgate)
+        except Exception:
+            signal_pattern_research={'status':'UNAVAILABLE','reason':'PATTERN_INPUT_ERROR'}
     core541_current={'status':'UNAVAILABLE','reason':'KIS 최신 검증 완료봉 스윙 연구 전용'}
     if (mode=='스윙' and resolved_source=='kis' and not market.synthetic and not stale and asof_date is None
             and integrity_state and integrity_state.get('verified') and integrity_state.get('regular_volume_verified')
@@ -462,7 +471,7 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         'higher_timeframe_context':higher_trend,
         'high_precision_research':hp,
         'core_comparison_research':core_comparison,'core541_current':core541_current,
-        'candle_research':candle_research,
+        'candle_research':candle_research,'signal_pattern_research':signal_pattern_research,
         'signal_is_current':policy['signal_is_current'],
         'final_actionable_signal':policy['final_actionable_signal'],
         'historical_signal':policy['historical_signal'],
