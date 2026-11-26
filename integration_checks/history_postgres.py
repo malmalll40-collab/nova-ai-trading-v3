@@ -23,6 +23,36 @@ def main():
             cur.execute('SELECT pg_advisory_unlock(%s)',(PROBE_LOCK,))
             assert cur.fetchone()==(True,)
     print('Direct session probe PASS: lock survived read-only commit and was released')
+    from research_kis_shared_quota import SharedQuotaLedger,BUFFER_SECONDS
+    from concurrent.futures import ThreadPoolExecutor
+    import time
+    ledger=SharedQuotaLedger(dsn)
+    peer=SharedQuotaLedger(dsn)
+    ledger.initialize(4)
+    peer.initialize(4)
+    for operation in (lambda:peer.initialize(5),lambda:peer.claim('foreground',5)):
+        try:operation()
+        except ValueError as exc:assert str(exc)=='SHARED_QUOTA_POLICY_MISMATCH'
+        else:raise AssertionError('conflicting cap accepted')
+    first=ledger.claim('foreground',4)
+    assert first and peer.claim('research',4) is None
+    assert peer.finish(first) is True and ledger.finish(first) is False
+    r=peer.claim('research',4)
+    assert r and ledger.claim('research',4) is None
+    # Concurrent independent connections cannot oversubscribe the common cap.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        claims=list(pool.map(lambda _:SharedQuotaLedger(dsn).claim('foreground',4),range(4)))
+    accepted=[x for x in claims if x is not None]
+    assert len(accepted)==2 and peer.claim('foreground',4) is None
+    assert ledger.finish(r) and all(peer.finish(x) for x in accepted)
+    assert ledger.claim('foreground',4) is None
+    time.sleep(BUFFER_SECONDS+0.2)
+    abandoned=peer.claim('foreground',4)
+    assert abandoned
+    time.sleep(BUFFER_SECONDS+0.2)
+    assert ledger.claim('research',4) is None
+    assert ledger.finish(abandoned)
+    print('Shared quota ledger PASS: cross-connection cap, foreground priority, completion buffer, abandoned lease blocking')
     tx=transaction_factory(dsn)
     days=tuple(date(2026,11,23)+timedelta(days=i) for i in range(3))
     symbol=SYMBOLS[0]
