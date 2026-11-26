@@ -2591,6 +2591,21 @@ def recommendations_diagnose(request: Request, basis_date: str | None = None):
         raise HTTPException(409,'KRX 연결 진단이 이미 진행 중입니다.')
     try:
         details=diagnose_bounded(key,dates,probe=diagnose_connection)
+        # Only fixed metadata, never raw vendor responses or key/header values.
+        from ops_diagnostics import emit
+        for item in details.get('results',[]):
+            state=item.get('state')
+            market=item.get('market')
+            day=item.get('date')
+            if (market not in ('kospi','kosdaq') or day not in dates
+                or state not in ('success','no_data','auth_denied','rate_limited','provider_error','network_error')):
+                continue
+            http=item.get('http_status')
+            count=item.get('record_count')
+            emit('krx_manual_diagnostic',{'market':market,'day':day,'state':state,
+                'http_status':http if type(http) is int and 100<=http<=599 else None,
+                'record_count':count if type(count) is int and 0<=count<=100000 else None,
+                'stored_rows':0,'orders_enabled':False})
         return JSONResponse(details,headers={'Cache-Control':'no-store'})
     finally:
         KRX_DIAG_LOCK.release()

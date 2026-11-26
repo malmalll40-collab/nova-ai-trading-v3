@@ -214,3 +214,21 @@ def test_date_ui_has_explicit_empty_result_and_date_labels():
     assert 'type="date" id="recommendDiagnoseDate"' in h
     assert '?basis_date='+'' in j and 'encodeURIComponent(date)' in j
     assert 'item.date||d.date' in j and '빈 응답' in j
+
+
+def test_manual_diagnostic_logs_only_allowlisted_counts(monkeypatch):
+    import ops_diagnostics
+    c=TestClient(server.app);server.RATE.clear()
+    monkeypatch.delenv('NOVA_ACCESS_TOKEN',raising=False)
+    monkeypatch.setenv('KRX_API_KEY','private-test-secret-krx-key')
+    events=[]
+    monkeypatch.setattr(ops_diagnostics,'emit',lambda name,data:events.append((name,data)))
+    def probe(key,day,markets):
+        return {'configured':True,'results':[{'market':m,'state':'success','http_status':200,
+            'record_count':3,'detail':'fixture-only','ignored':'secret-fixture'} for m in markets]}
+    monkeypatch.setattr(server,'diagnose_connection',probe)
+    r=c.post('/api/recommendations/diagnose?basis_date=2026-11-20')
+    assert r.status_code==200 and len(events)==2
+    assert events[0]==('krx_manual_diagnostic',{'market':'kospi','day':'20261120','state':'success',
+        'http_status':200,'record_count':3,'stored_rows':0,'orders_enabled':False})
+    assert 'secret' not in json.dumps(events)
