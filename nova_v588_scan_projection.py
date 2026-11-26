@@ -11,7 +11,7 @@ def project(f,cfg,*,market,source,stale,asof,financial_gate,finance_note,scan_fr
     out={'symbol':market.symbol,'mode':cfg.mode,'source':source,'provider':market.provider,
          'is_demo':market.synthetic,'is_stale':stale,'scan_freshness':scan_freshness,
          'asof_evaluation_only':True,'financial_gate':financial_gate,
-         'signal_pattern_research':pattern,'last_completed_bar':f.index[-1].isoformat()}
+         'signal_pattern_research':pattern,'last_completed_bar':str(f.index[-1])}
     if profile=='pattern':
         return out
     d=decision(f,cfg)
