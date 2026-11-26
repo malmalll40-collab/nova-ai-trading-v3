@@ -383,7 +383,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
                     analyze_asof: Callable[[str,str],dict]|None=None,
                     progress: Callable[[dict],None]|None=None, now: datetime|None=None,
                     client:KRXClient|None=None, depth: int = MAX_DEEP,
-                    auxiliary_flow:Callable[[str],dict|None]|None=None, pattern_only:bool=False):
+                    auxiliary_flow:Callable[[str],dict|None]|None=None, pattern_only:bool=False,
+                    check_cancel:Callable[[],None]|None=None):
     """Run complete KRX universe snapshot and explicit limited deep investigation."""
     if type(pattern_only) is not bool or (pattern_only and analyze_asof is None):
         raise MarketScanError('invalid_profile','신호패턴 검색은 기준일 분석이 필요합니다.')
@@ -391,6 +392,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
         raise MarketScanError('invalid_depth','심층 분석 수는 24/48/60 중에서 선택하세요.')
     if market not in ('all','kospi','kosdaq'):
         raise MarketScanError('invalid_input','시장 선택은 전체·코스피·코스닥 중 하나여야 합니다.')
+    checkpoint=check_cancel or (lambda: None)
+    checkpoint()
     client=client or KRXClient(api_key)
     markets=['kospi','kosdaq'] if market=='all' else [market]
     moment=now or datetime.now(tz=KST)
@@ -401,7 +404,11 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
     expected_asof=dates[0] if dates else None
     for date in dates:
         try:
-            per=[client.fetch_day(date,m) for m in markets]
+            per=[]
+            for m in markets:
+                checkpoint()
+                per.append(client.fetch_day(date,m))
+                checkpoint()
             calls+=len(per)
         except MarketScanError as exc:
             # Retry only a genuinely unpublished date. Never retry authentication,
@@ -441,6 +448,7 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
     from nova_v584_pattern_scan import candidate as pattern_candidate, finish as pattern_finish
     pattern_rows=[];pattern_exclusions={}
     for i,row in enumerate(top):
+        checkpoint()
         if progress: progress({'phase':'deep','done':i,'total':len(top),
             'message':f'전체 {len(whole)}종목 중 1차 후보 {len(selected)}종목, 심층 분석 {i}/{len(top)}'})
         try:
@@ -489,6 +497,7 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
             result['rejected'].append({'symbol':row['symbol'],'name':row['name'],
                 'reason_code':'DEEP_ANALYSIS_ERROR',
                 'reason':'심층 시세·재무 조회에 실패했습니다 (인증·공급원·요청 제한 가능).'})
+    checkpoint()
     # Rank AFTER every deep candidate was evaluated. A discovery-order list
     # would mislead users and truncating before ranking could hide better cards.
     result['recommendations'].sort(key=strict_candidate_rank_key)
@@ -530,6 +539,7 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
         result['recommended_count']=None
         result['interest_count']=None
 
+    checkpoint()
     if progress:progress({'phase':'complete','done':len(top),'total':len(top),
         'message':(f'신호패턴 분석 완료: {len(pattern_rows)}개 연구 후보' if pattern_only else f'분석 완료: {len(result["recommendations"])}개 매수 후보')+f', 심층 조회 실패 {result["deep_failed"]}개'})
     return result
