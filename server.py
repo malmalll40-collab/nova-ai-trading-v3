@@ -77,6 +77,14 @@ async def _app_lifespan(application):
     except Exception:
         logging.getLogger('uvicorn.error').warning('NOVA_OPS startup diagnostic failed; service remains available')
     stop_preflight = threading.Event()
+    # Explicit owner-authorized rollout only; disabled by default.
+    if os.getenv('NOVA_RESEARCH_ACTIVATION')=='1':
+        try:
+            from research_operational_activation import install_and_start
+            install_and_start(stop_preflight,_ops_preflight_snapshot,krx_session)
+        except Exception:
+            from ops_diagnostics import emit
+            emit('research_activation',{'status':'BLOCKED','reason':'STARTUP_FAILED','orders_enabled':False})
     try:
         threading.Thread(target=_ops_preflight_loop,args=(stop_preflight,),daemon=True,name='nova-ops-preflight').start()
     except Exception:

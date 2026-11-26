@@ -160,6 +160,15 @@ def main():
     assert complete['status']=='COVERAGE_COMPLETE' and complete['stored_rows']==len(full_days)*len(SYMBOLS)
     assert set(raw)==set(SYMBOLS) and all(set(v)==set(full_days) for v in raw.values())
     print('Integrated snapshot PASS: full cohort, partial refusal and checksum failure')
+    # Full-size checkpoint batch on the actual PostgreSQL adapter.
+    bulk_days=tuple(date(2023,11,27)+timedelta(days=i) for i in range(729))
+    with tx() as (cur,kind):
+        bulk_id=initialize(cur,kind,bulk_days)
+        rows={d:{'close':float(i+100)} for i,d in enumerate(bulk_days)}
+        assert append(cur,kind,bulk_id,SYMBOLS[0],rows)==729
+        assert append(cur,kind,bulk_id,SYMBOLS[0],rows)==0
+        assert saved(cur,kind,bulk_id,SYMBOLS[0])==rows
+    print('Bulk checkpoint PASS: 729 rows, idempotent verification')
     print('PostgreSQL integration PASS: durable resume, idempotence, rollback, isolated rows')
 if __name__=='__main__':
     main()

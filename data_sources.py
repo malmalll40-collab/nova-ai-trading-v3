@@ -170,7 +170,7 @@ class KIS:
         try:
             with KIS_LOAD.physical(token=True):
                 r=self.session.post(self.BASE+'/oauth2/tokenP',json={'grant_type':'client_credentials',
-                    'appkey':self.key,'appsecret':self.secret},timeout=12)
+                    'appkey':self.key,'appsecret':self.secret},timeout=12,**KIS_LOAD.transport_options())
             try:
                 r.raise_for_status()
                 data=r.json()
@@ -216,7 +216,7 @@ class KIS:
         for attempt in range(2):
             try:
                 with KIS_LOAD.physical(retry=attempt>0):
-                    response=self.session.get(self.BASE+path,headers=headers,params=params,timeout=12)
+                    response=self.session.get(self.BASE+path,headers=headers,params=params,timeout=12,**KIS_LOAD.transport_options())
             except requests.Timeout:
                 if attempt == 0:
                     time.sleep(1.0)
