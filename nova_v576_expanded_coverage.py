@@ -49,10 +49,10 @@ def quiet_window(now,schedule):
     if now.tzinfo is None:return False
     if not schedule.get('calendar_verified') or schedule.get('status')!='CLOSED':return False
     here=now.astimezone(KST).time()
-    if not schedule.get('open_kst') and not schedule.get('close_kst'):
-        return True # verified non-session
-    if not schedule.get('open_kst') or not schedule.get('close_kst'):return False
-    return here<=walltime(8,45) or here>=walltime(19,0)
+    # KRX regular-session CLOSED alone does not certify NXT/after-hours closed.
+    # Apply the buffer on every date, even a verified KRX non-session.
+    if bool(schedule.get('open_kst'))!=bool(schedule.get('close_kst')):return False
+    return here<=walltime(7,45) or here>=walltime(20,10)
 
 
 class GuardedBudget(Budget):
