@@ -4,6 +4,7 @@ from nova_v574_data_audit import PILOT_DAYS,session_dates
 from nova_v576_expanded_coverage import corrected_sessions,SYMBOLS
 from research_history_run_control import read_status
 from krx_calendar_verified import CalendarUnavailable
+from research_db_endpoint import endpoint_kind
 
 END=date(2026,11,25)
 START=END-timedelta(days=PILOT_DAYS-1)
@@ -11,6 +12,7 @@ START=END-timedelta(days=PILOT_DAYS-1)
 def probe(dsn,*,calendar=session_dates,reader=read_status):
     base={'start':START.isoformat(),'end':END.isoformat(),
           'requested_streams':len(SYMBOLS),'research_only':True,
+          'db_endpoint_kind':endpoint_kind(dsn),'session_mode_confirmed':False,
           'execution_authorized':False,'strategy_adoption':'HOLD','orders_enabled':False,
           'training_ready':False,'historical_calendar_fully_verified':False,
           'point_in_time_universe_verified':False}
