@@ -383,8 +383,10 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
                     analyze_asof: Callable[[str,str],dict]|None=None,
                     progress: Callable[[dict],None]|None=None, now: datetime|None=None,
                     client:KRXClient|None=None, depth: int = MAX_DEEP,
-                    auxiliary_flow:Callable[[str],dict|None]|None=None):
+                    auxiliary_flow:Callable[[str],dict|None]|None=None, pattern_only:bool=False):
     """Run complete KRX universe snapshot and explicit limited deep investigation."""
+    if type(pattern_only) is not bool or (pattern_only and analyze_asof is None):
+        raise MarketScanError('invalid_profile','신호패턴 검색은 기준일 분석이 필요합니다.')
     if type(depth) is not int or depth not in DEEP_OPTIONS:
         raise MarketScanError('invalid_depth','심층 분석 수는 24/48/60 중에서 선택하세요.')
     if market not in ('all','kospi','kosdaq'):
@@ -454,6 +456,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
             except Exception:
                 pattern_exclusions['PATTERN_ERROR']=pattern_exclusions.get('PATTERN_ERROR',0)+1
 
+            if pattern_only:
+                continue
             rec,why=evaluate_candidate(row,detail,asof)
             if rec:
                 if fsc:
@@ -520,9 +524,14 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
     result['analyzed_fraction']=round(len(top)/len(selected),3) if selected else 0.0
     result['incomplete']=result['deep_failed']>0
     result['signal_pattern_research']=pattern_finish(pattern_rows,pattern_exclusions,asof=asof,target=len(top))
+    result['scan_profile']='pattern' if pattern_only else 'full'
+    if pattern_only:
+        result['method']='동일 일별 스냅샷 및 후보 선별 → 신호패턴 전용 검증 (엄격 매수/관심 순위 미실행)'
+        result['recommended_count']=None
+        result['interest_count']=None
 
     if progress:progress({'phase':'complete','done':len(top),'total':len(top),
-        'message':f'분석 완료: {len(result["recommendations"])}개 매수 후보, 심층 조회 실패 {result["deep_failed"]}개'})
+        'message':(f'신호패턴 분석 완료: {len(pattern_rows)}개 연구 후보' if pattern_only else f'분석 완료: {len(result["recommendations"])}개 매수 후보')+f', 심층 조회 실패 {result["deep_failed"]}개'})
     return result
 
 

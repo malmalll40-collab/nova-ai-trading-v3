@@ -299,7 +299,9 @@ def _get_financial_state(symbol: str, mode: str) -> tuple[str, str, int | None]:
 
 
 
-def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None)->dict:
+def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None,*,scan_profile:str|None=None)->dict:
+    if scan_profile is not None and (scan_profile not in ('full','pattern') or asof_date is None or mode!='스윙' or source not in ('kis','auto')):
+        raise ValueError('Invalid scan profile')
     cfg = Config.for_mode(mode, cost_bps)
     resolved_source=source
     fallback_reason=None
@@ -346,13 +348,14 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
         if len(market.bars)<65:
             raise ValueError('확정 거래일 기준 완료봉이 65개 미만입니다. 분석을 보류합니다.')
     f=feature_frame(market.bars,mode)
-    higher_trend = (summarize_higher_trends(market.bars, '005930.KS' if market.synthetic else market.symbol, now=datetime.now(KST), historical=asof_date is not None)
-                    if mode == '스윙' else None)
-    d=decide(f,cfg)
-    bt=run_backtest(market.bars,cfg)
-    q=quality_gate(f,cfg,raw_signal=d.signal)
-    compared=quality_comparison(f,cfg)
-    signal_stats=signal_performance(f,cfg)
+    if scan_profile is None:
+        higher_trend = (summarize_higher_trends(market.bars, '005930.KS' if market.synthetic else market.symbol, now=datetime.now(KST), historical=asof_date is not None)
+                        if mode == '스윙' else None)
+        d=decide(f,cfg)
+        bt=run_backtest(market.bars,cfg)
+        q=quality_gate(f,cfg,raw_signal=d.signal)
+        compared=quality_comparison(f,cfg)
+        signal_stats=signal_performance(f,cfg)
     age=_last_age_minutes(f.index[-1],market.symbol if not market.synthetic else '005930.KS',mode)
     fresh_limit={'1분':8, '5분':25, '15분':55, '스윙':3*24*60}[mode]
     live_price_stale = False if market.synthetic else age is None or age > fresh_limit
@@ -365,6 +368,12 @@ def _payload(symbol:str,mode:str,source:str,cost_bps:int,asof_date:str|None=None
              else bool(completed_session['stale']) if completed_session is not None
              else live_price_stale)
     fgate, fnote, fyear = _get_financial_state(market.symbol, mode) if not market.synthetic else ('NOT_APPLIED', '가상 데이터', None)
+    if scan_profile is not None:
+        from nova_v588_scan_projection import project
+        return project(f,cfg,market=market,source=resolved_source,stale=stale,asof=asof_date,
+            financial_gate=fgate,finance_note=fnote,scan_freshness=scan_freshness,profile=scan_profile,
+            decision=decide,quality=quality_gate,stats=signal_performance,policy=resolve_final_signal,
+            safe_float=_safe_float)
     policy = resolve_final_signal(q['strict_signal'], mode=mode, symbol=market.symbol,
                                   financial_gate=fgate, finance_reason=fnote,
                                   stale=stale, is_demo=market.synthetic)
@@ -1613,7 +1622,8 @@ def _cached_research_flow(symbol: str) -> dict | None:
     return result if isinstance(result,dict) and result.get('symbol')==code else None
 
 
-def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: int=48):
+def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: int=48, profile: str='full'):
+    started=time.monotonic()
     def progress(p):
         with SCAN_LOCK:
             if SCAN_STATE.get('job_id')==job_id:
@@ -1622,16 +1632,21 @@ def _scan_worker(market: str, job_id: str, provider: str, api_key: str, depth: i
         client = FSCStockClient(api_key) if provider == 'fsc' else None
         result=run_market_scan(market=market,api_key=api_key,client=client,
                      analyze=lambda sym:_payload(sym,'스윙','kis',15),
-                     analyze_asof=lambda sym,date:_payload(sym,'스윙','kis',15,asof_date=date),
-                     progress=progress,depth=depth,auxiliary_flow=_cached_research_flow)
+                     analyze_asof=lambda sym,date:_payload(sym,'스윙','kis',15,asof_date=date,scan_profile=profile),
+                     progress=progress,depth=depth,auxiliary_flow=_cached_research_flow if profile=='full' else None,
+                     pattern_only=profile=='pattern')
+        result['scan_profile']=profile
+        result['elapsed_seconds']=round(time.monotonic()-started,2)
         # Store the first actually observed ranked market candidates, without
         # changing existing recommendation decisions or screen response timing.
-        if evidence_backend() != 'disabled':
+        if profile=='full' and evidence_backend() != 'disabled':
             try:
                 contexts=capture_market_context()
                 store_auto_scan(result,market_context=contexts)
             except Exception:
                 logging.getLogger('nova.autotrack').warning('Market scan evidence persistence failed')
+        result['elapsed_seconds']=round(time.monotonic()-started,2)
+        logging.getLogger('nova.scan').info('NOVA_SCAN profile=%s elapsed_seconds=%.2f deep_target=%s deep_failed=%s',profile,result['elapsed_seconds'],result.get('deep_target'),result.get('deep_failed'))
         with SCAN_LOCK:
             if SCAN_STATE.get('job_id')==job_id:
                 SCAN_STATE.update(status='complete',result=result,error=None,
@@ -2333,6 +2348,9 @@ def recommendations_status(request: Request):
 def recommendations_run(request: Request, body: dict):
     _authorize(request)
     _limit(request)
+    profile=body.get('profile','full')
+    if profile not in ('full','pattern'):
+        raise HTTPException(422,'검색 유형은 full 또는 pattern이어야 합니다.')
     depth=body.get('depth',48)
     if type(depth) is not int or depth not in (24,48,60):
         raise HTTPException(422,'심층 분석 수는 24/48/60 중에서 선택하세요.')
@@ -2362,7 +2380,7 @@ def recommendations_run(request: Request, body: dict):
             return JSONResponse(dict(_scan_snapshot(),notice='이미 시장 검색이 진행 중입니다.'),
                                 headers={'Cache-Control':'no-store'})
         if (current=='complete' and SCAN_STATE.get('market')==market and SCAN_STATE.get('source')==provider and
-            SCAN_STATE.get('depth')==depth and
+            SCAN_STATE.get('depth')==depth and SCAN_STATE.get('scan_profile','full')==profile and
             SCAN_STATE.get('completed_monotonic') and
             time.monotonic()-SCAN_STATE['completed_monotonic']<20*60):
             return JSONResponse(dict(_scan_snapshot(),notice='20분 이내 완료한 검색 결과를 재사용합니다.'),
@@ -2370,11 +2388,11 @@ def recommendations_run(request: Request, body: dict):
         job_id=secrets.token_hex(8)
         SCAN_STATE.clear()
         label='금융위원회 T+1' if provider=='fsc' else 'KRX 장 마감'
-        SCAN_STATE.update(status='running',market=market,source=provider,depth=depth,job_id=job_id,
+        SCAN_STATE.update(status='running',market=market,source=provider,depth=depth,job_id=job_id,scan_profile=profile,
             progress={'phase':'provider','done':0,'total':None,'message':f'{label} 일별 시장자료 확인 중'},
             result=None,error=None,started_at=datetime.now(timezone.utc).isoformat(timespec='seconds'),
             started_monotonic=time.monotonic())
-        SCAN_JOB=threading.Thread(target=_scan_worker,args=(market,job_id,provider,key,depth),daemon=True,
+        SCAN_JOB=threading.Thread(target=_scan_worker,args=(market,job_id,provider,key,depth,profile),daemon=True,
                                    name='nova-market-eod-scan')
         SCAN_JOB.start()
     return JSONResponse(_scan_snapshot(),headers={'Cache-Control':'no-store'})
