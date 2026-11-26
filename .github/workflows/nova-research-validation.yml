@@ -63,7 +63,7 @@ jobs:
           print('Root archive count:', len(archives))
           assert len(archives) == 1, 'Render extraction requires exactly one root ZIP'
           tracked = set(subprocess.check_output(['git','ls-files','-z']).decode().split('\0'))
-          required = {'server.py','nova_release.py','nova_v588_scan_projection.py','nova_v593_scan_cache.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','nova_v580_integrated.py','nova_v582_signal_pattern.py','nova_v583_pattern_replay.py','nova_v584_pattern_scan.py','static/pattern_research.js','static/recommendations.js','static/candles.js','static/index.html','static/sw.js','market_scanner.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py','ops_preflight.py','research_history_checkpoint.py','research_history_resume.py'}
+          required = {'server.py','nova_release.py','nova_v588_scan_projection.py','nova_v593_scan_cache.py','requirements.txt','nova_v570_accuracy.py','nova_v571_policy.py','nova_v572_calibration.py','nova_v573_ml.py','nova_v574_data_audit.py','nova_v575_calendar_coverage.py','nova_v576_expanded_coverage.py','nova_v577_split_coverage.py','nova_v578_kis_telemetry.py','nova_v579_admission.py','nova_v580_integrated.py','nova_v582_signal_pattern.py','nova_v583_pattern_replay.py','nova_v584_pattern_scan.py','static/pattern_research.js','static/recommendations.js','static/candles.js','static/index.html','static/sw.js','market_scanner.py','data_sources.py','nova_v541_core.py','nova_v542_aligned.py','ops_diagnostics.py','ops_preflight.py','research_history_checkpoint.py','research_history_resume.py','research_history_postgres.py','integration_checks/history_postgres.py'}
           assert required <= tracked, 'Required research source not tracked'
           with zipfile.ZipFile(archives[0]) as z:
               names = set()
@@ -83,3 +83,34 @@ jobs:
               for name in sorted(required):
                   print(name, hashlib.sha256((root/name).read_bytes()).hexdigest(), 'archive-identical' if name in names else 'checkout-only')
           PY
+  postgres-history-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nova_ci
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: nova_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nova_ci -d nova_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PYTHONPATH: "."
+      NOVA_TEST_POSTGRES_DSN: postgresql://nova_ci:local_ci_only@127.0.0.1:5432/nova_ci
+      NOVA_OPS_DIAGNOSTICS_ON_START: "0"
+      NOVA_CORE541_EVIDENCE_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify PostgreSQL history transactions
+        run: python integration_checks/history_postgres.py
