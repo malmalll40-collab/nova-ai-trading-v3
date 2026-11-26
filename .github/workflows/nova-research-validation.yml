@@ -37,7 +37,7 @@ jobs:
           node --check static/candles.js
           node --check static/app.js
           node --check static/v5_dashboard.js
-          node --test tests/test_v585_pattern_ui.cjs tests/test_v586_pattern_menu.cjs tests/test_v591_chart_overlay.cjs
+          node --test tests/test_v585_pattern_ui.cjs tests/test_v586_pattern_menu.cjs tests/test_v591_chart_overlay.cjs tests/test_v601_scan_interruption.cjs
       - name: Regression tests
         run: |
           python -m pytest --collect-only -q > /tmp/nova-test-collection.txt
