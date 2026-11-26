@@ -436,6 +436,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
         'persistence':'Render 프로세스 메모리에만 저장; 서버 재시작 시 결과 소멸'}
     for row in top:
         lane=row['selection_lane'];result['selection_lanes'][lane]=result['selection_lanes'].get(lane,0)+1
+    from nova_v584_pattern_scan import candidate as pattern_candidate, finish as pattern_finish
+    pattern_rows=[];pattern_exclusions={}
     for i,row in enumerate(top):
         if progress: progress({'phase':'deep','done':i,'total':len(top),
             'message':f'전체 {len(whole)}종목 중 1차 후보 {len(selected)}종목, 심층 분석 {i}/{len(top)}'})
@@ -444,6 +446,14 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
             if isinstance(detail,dict):
                 detail=dict(detail,scan_expected_asof=expected_asof)
             result['deep_succeeded']+=1
+            # Failures in the research overlay cannot change existing candidates.
+            try:
+                p,reason=pattern_candidate(row,detail,asof,expected_asof)
+                if p is not None:pattern_rows.append(p)
+                else:pattern_exclusions[reason]=pattern_exclusions.get(reason,0)+1
+            except Exception:
+                pattern_exclusions['PATTERN_ERROR']=pattern_exclusions.get('PATTERN_ERROR',0)+1
+
             rec,why=evaluate_candidate(row,detail,asof)
             if rec:
                 if fsc:
@@ -509,6 +519,8 @@ def run_market_scan(*, market: str, api_key: str, analyze: Callable[[str],dict],
         result['rejection_codes'][code]=result['rejection_codes'].get(code,0)+1
     result['analyzed_fraction']=round(len(top)/len(selected),3) if selected else 0.0
     result['incomplete']=result['deep_failed']>0
+    result['signal_pattern_research']=pattern_finish(pattern_rows,pattern_exclusions,asof=asof,target=len(top))
+
     if progress:progress({'phase':'complete','done':len(top),'total':len(top),
         'message':f'분석 완료: {len(result["recommendations"])}개 매수 후보, 심층 조회 실패 {result["deep_failed"]}개'})
     return result
