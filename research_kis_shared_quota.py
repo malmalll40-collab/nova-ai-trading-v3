@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 TABLE='nova_kis_shared_quota_v1'
+POLICY_TABLE='nova_kis_shared_policy_v1'
 LOCK_KEY=601_576_003
 BUFFER_SECONDS=1.1
 RESEARCH_RESERVE=2
@@ -36,13 +37,24 @@ class SharedQuotaLedger:
                 cur.execute('SELECT pg_advisory_xact_lock(%s)',(LOCK_KEY,))
                 yield cur
 
-    def initialize(self):
+    def initialize(self,limit):
         """Explicit schema operation; never called by claim, finish or startup."""
+        if type(limit) is not int or not 1<=limit<=100:
+            raise ValueError('INVALID_QUOTA_POLICY')
         with self._tx() as cur:
+            cur.execute(f'CREATE TABLE IF NOT EXISTS {POLICY_TABLE} (singleton INTEGER PRIMARY KEY CHECK (singleton=1), cap INTEGER NOT NULL CHECK (cap BETWEEN 1 AND 100))')
+            cur.execute(f'INSERT INTO {POLICY_TABLE}(singleton,cap) VALUES (1,%s) ON CONFLICT DO NOTHING',(limit,))
+            self._check_policy(cur,limit)
             cur.execute(f"""CREATE TABLE IF NOT EXISTS {TABLE} (
                 lease_id TEXT PRIMARY KEY,
                 kind TEXT NOT NULL CHECK (kind IN ('foreground','research')),
                 finished_at TIMESTAMPTZ NULL)""")
+
+    @staticmethod
+    def _check_policy(cur,limit):
+        cur.execute(f'SELECT cap FROM {POLICY_TABLE} WHERE singleton=1')
+        if cur.fetchone()!=(limit,):
+            raise ValueError('SHARED_QUOTA_POLICY_MISMATCH')
 
     def claim(self,kind,limit):
         """Atomic, non-waiting policy decision after short bounded DB lock.
@@ -55,6 +67,7 @@ class SharedQuotaLedger:
         if kind not in ('foreground','research') or type(limit) is not int or not 1<=limit<=100:
             raise ValueError('INVALID_QUOTA_POLICY')
         with self._tx() as cur:
+            self._check_policy(cur,limit)
             cur.execute(f"DELETE FROM {TABLE} WHERE finished_at IS NOT NULL AND finished_at <= clock_timestamp() - (%s * interval '1 second')",(BUFFER_SECONDS,))
             cur.execute(f"SELECT count(*), count(*) FILTER (WHERE kind='foreground' AND finished_at IS NULL), count(*) FILTER (WHERE kind='research' AND finished_at IS NULL) FROM {TABLE}")
             used,foreground,research=cur.fetchone()
