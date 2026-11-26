@@ -9,7 +9,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=__NOVA_APP_VERSION__">
   <title>NOVA | AI Trading Mobile v__NOVA_APP_VERSION__</title>
 </head>
 <body>
@@ -19,7 +19,14 @@
       <div class="top-actions"><span id="connectionBadge" class="status-pill"><i class="status-dot"></i>준비</span><button id="settingsButton" class="icon-button" type="button" aria-label="연결 및 설정" title="설정">⚙</button></div>
     </header>
     <main>
-      <section class="headline-area" aria-labelledby="headline"><div class="eyebrow">SMART MARKET RESEARCH <span class="pill-mini">13 ROLES</span></div><h1 id="headline">분석은 더 깊게.<br><span class="gradient-text">판단은 더 명확하게.</span></h1><p class="intro">마지막 <b>완료봉</b>의 기술적 신호와 과거 검증을 한 화면에서 확인하세요.</p></section>
+      <section class="headline-area v6-headline" aria-labelledby="headline"><h1 id="headline">종목 분석</h1><p class="intro">완료봉 기준 판단 · 실거래 주문 없음</p></section>
+      <section id="view-home" class="panel-view v6-home" hidden aria-labelledby="v6HomeTitle">
+        <div class="v6-home-title"><div><h1 id="v6HomeTitle">투자 대시보드</h1><p class="subline">종목 발견부터 판단까지</p></div><span class="tiny-tag">개인 분석용</span></div>
+        <section class="panel v6-home-status"><h3>시장 운영 상태</h3><div id="v6MarketStatus" role="status" aria-live="polite">정규장 운영 상태 조회 전</div><p class="note" id="v6MarketMeta">KRX 정규장 기준 · NXT 및 애프터마켓 미포함</p><button class="secondary-button" type="button" id="v6MarketRefresh">시장 상태 확인</button></section>
+        <div class="v6-actions"><button type="button" class="primary-button" data-guide-target="analyze">종목 찾아 분석</button><button type="button" class="secondary-button" data-guide-target="recommendations">종목 탐색</button><button type="button" class="secondary-button" data-guide-target="watchlist">관심 종목</button></div>
+        <section class="panel"><h3>마지막 검색 상태</h3><p id="v6HomeFull" class="note">전체 시장 · 확인 전</p><p id="v6HomePattern" class="note">신호패턴 · 확인 전</p><button type="button" class="secondary-button" data-guide-target="recommendations">검색 및 상세 결과 보기</button><p class="note">이 화면은 자동으로 새 검색을 실행하지 않습니다. 상세 결과는 추천 화면에서 확인하세요.</p></section>
+        <section class="panel"><h3>최근 분석 종목</h3><div id="v6RecentStocks" class="v6-recent-list"><p class="note">이 기기에서 성공적으로 조회한 종목이 여기에 표시됩니다.</p></div></section>
+      </section>
       <section class="query-panel" aria-label="종목 검색">
         <form id="searchForm" class="search-row"><label for="symbolInput" class="sr-only">종목명 또는 종목코드</label><span class="search-icon" aria-hidden="true">⌕</span><input id="symbolInput" type="search" role="combobox" aria-controls="searchSuggestions" aria-expanded="false" aria-autocomplete="list" value="005930.KS" autocomplete="off" spellcheck="false" placeholder="국내 종목명 · 에코프로 / 삼성전자 / 005930.KS" maxlength="40"><button class="primary-button" type="submit">분석 <span aria-hidden="true">↗</span></button></form><div id="searchSuggestions" class="search-suggestions" role="listbox" aria-label="종목 검색 결과" hidden></div><div id="selectedStockIdentity" class="selected-stock-identity" role="status" aria-live="polite" hidden><span>현재 분석 종목</span><strong id="selectedStockIdentityText">—</strong></div><p class="search-note">코스피·코스닥 종목명 또는 국내 6자리 코드로 검색할 수 있습니다. 코스피·코스닥 시장 구분을 확인한 뒤 분석합니다.</p>
         <div class="quick-row" aria-label="빠른 종목 선택"><button type="button" class="quick-chip" data-symbol="086520.KQ">에코프로 · 코스닥</button><button type="button" class="quick-chip" data-symbol="247540.KQ">에코프로비엠</button><button type="button" class="quick-chip" data-symbol="005930.KS">삼성전자</button><button type="button" class="quick-chip" data-symbol="000660.KS">SK하이닉스</button></div>
@@ -32,6 +39,11 @@
         <div id="demoWarning" class="warning-bar" hidden>가상 데이터 체험 중 · 실제 종목 시세나 투자 추천이 아닙니다.</div>
         <div id="staleWarning" class="warning-bar" hidden>시세가 오래되어 신규 매수·매도 추천을 보류했습니다. 아래 정보는 지난 봉 참고용입니다.</div>
         <div id="view-analyze" class="panel-view">
+        <section class="v6-decision-summary" aria-label="완료봉 핵심 판단">
+          <div class="v6-decision-row"><span class="tiny-tag">완료봉 판단</span><strong id="v6SignalLabel">분석 대기</strong><small id="v6SignalDate">—</small></div>
+          <p id="v6SignalReason" class="note">시세 검증 후 판단이 표시됩니다.</p>
+          <div class="v6-decision-metrics"><div><small>기준 종가</small><strong id="v6Reference">—</strong></div><div><small>참고 손절가</small><strong id="v6Stop">—</strong></div><div><small>참고 목표가</small><strong id="v6Target">—</strong></div></div>
+        </section>
         <nav class="analysis-jump" aria-label="종목 분석 빠른 이동">
           <button type="button" data-scroll-target="chartPanel">▥ 차트</button>
           <button type="button" data-scroll-target="tradeDecisionPanel">◎ 매수 판단</button>
@@ -336,7 +348,9 @@
         </div>
       <section id="view-recommendations" class="panel-view recommend-view" hidden aria-labelledby="recommendTitle">
         <section class="panel">
-          <div class="section-title-row"><div><span class="eyebrow">MULTI-SOURCE MARKET SCANNER · V4.5</span><h2 id="recommendTitle">종목추천</h2></div><span class="tiny-tag">장 마감 자료 · 스윙</span></div>
+          <div class="section-title-row"><div><span class="eyebrow">시장 탐색</span><h2 id="recommendTitle">종목추천</h2></div><span class="tiny-tag">장 마감 자료 · 스윙</span></div>
+          <nav class="v6-scan-jump" aria-label="검색 메뉴"><button type="button" data-v6-recommend-target="fullMarketMenu">전체 시장</button><button type="button" data-v6-recommend-target="patternMenu">신호패턴</button><button type="button" data-v6-recommend-target="v6FullResults">검색 결과</button><button type="button" data-v6-recommend-target="popularPanel">인기 종목</button></nav>
+          <div class="v6-search-controls">
           <section id="patternMenu" class="recommend-card" aria-labelledby="patternMenuTitle">
             <div class="section-title-row"><div><span class="eyebrow">SIGNAL PATTERN</span><h3 id="patternMenuTitle">AI 신호패턴 추천</h3></div></div>
             <p class="subline">반복 매수 신호로 상승 초기·가속·지속형을 탐색합니다. 전체 시장 검색과 같은 기준일·후보 선별 기준으로 패턴만 분석합니다.</p>
@@ -353,28 +367,11 @@
               <button type="button" id="patternScan" class="primary-button recommend-run" disabled>신호패턴 종목 검색</button>
               <button type="button" id="patternCancel" class="recommend-diag-button" disabled>검색 취소</button>
               <p id="patternStatus" class="recommend-status" role="status" aria-live="polite">검색 기능 연결 대기 · 계속 이 상태라면 페이지를 새로고침하세요.</p>
-              <div id="patternResults" class="recommend-results" aria-live="polite"></div>
+
             </div>
           </section>
-          <details id="popularPanel" class="popular-expander"><summary>★ 인기종목 · 네이버 인기순위 / NOVA TOP 20</summary>
-            <div class="popular-details">
-          <div class="section-title-row"><div><span class="eyebrow">MARKET ACTIVITY · KOSPI / KOSDAQ</span><h2 id="popularTitle">인기종목</h2></div><span class="tiny-tag">국내 전용</span></div>
-          <p class="subline">인기종목에는 서로 다른 두 기준이 있어요. <b>네이버 인기종목</b>은 네이버 공식 페이지에서 확인하고, <b>NOVA 시장 활발 종목</b>은 이용 가능한 공식 일별 시세로 산출합니다. 서로 같은 순위가 아닙니다.</p>
-          <a class="popular-naver-link" href="https://stock.naver.com/market/stock/kr/stocklist/top" target="_blank" rel="noopener noreferrer">네이버 증권 실제 인기종목 열기 ↗</a>
-          <div class="popular-section-head"><strong>NOVA 시장 활동 TOP 20</strong><span>조회 인기 아님 · 매수추천 아님</span></div>
-          <label class="field-label" for="popularSource">시세 출처</label>
-          <select id="popularSource" class="field-input"><option value="auto">자동 (금융위원회 우선)</option><option value="fsc">금융위원회 T+1 장 마감</option><option value="krx">KRX 장 마감</option></select>
-          <label class="field-label" for="popularMarket">시장</label>
-          <select id="popularMarket" class="field-input"><option value="all">코스피 + 코스닥</option><option value="kospi">코스피</option><option value="kosdaq">코스닥</option></select>
-          <label class="field-label" for="popularKind">순위 기준</label>
-          <select id="popularKind" class="field-input"><option value="turnover">거래대금 상위</option><option value="volume">거래량 상위 (급증률 아님)</option><option value="gainers">당일 상승률 상위</option></select>
-          <button type="button" class="primary-button recommend-run" id="popularLoad">시장 활동 순위 조회</button>
-          <p class="recommend-status" id="popularStatus" role="status" aria-live="polite">네이버 인기종목은 위 공식 링크에서 볼 수 있습니다. NOVA 순위는 FSC 또는 KRX 데이터 사용 설정이 필요합니다.</p>
-          <p class="note">NOVA 순위는 <b>최근 이용 가능한 장 마감 자료</b>입니다. 현재가·실시간 인기·상승 확률이 아닙니다. API 접근/재이용 권한이 확보된 개인 연구용으로 사용하세요.</p>
-          <div id="popularResults" class="popular-results" aria-live="polite"></div>
-            </div>
-          </details>
-          <p class="subline">금융위원회 공공데이터포털의 <b>T+1 일별 주식시세</b>를 우선 활용하고, KRX는 선택적으로 이용합니다. 전체 시장에서 1차 선별 후 <b>24·48·60개를 선택해</b> NOVA·OpenDART·별도 기간 검증으로 심층 분석합니다. 기본 48개는 유동성과 하루 거래활동을 함께 고려합니다. 엄격 매수 후보와 연구 관심 후보를 분리합니다.</p>
+
+          <section id="fullMarketMenu" class="recommend-card" aria-label="전체 시장 검색"><h3>전체 시장 검색</h3><p class="subline">장 마감 자료 기반 · 1차 선별 후 24·48·60개 심층 평가</p>
           <label class="field-label" for="recommendSource">전체 검색 데이터 공급원</label>
           <select id="recommendSource" class="field-input"><option value="auto">자동 선택 (금융위원회 우선)</option><option value="fsc">금융위원회 일별 시세 (T+1)</option><option value="krx">KRX 일별매매정보 (기존)</option></select>
           <label class="field-label" for="recommendMarket">시장 선택</label>
@@ -395,8 +392,27 @@
           <p id="recommendStatus" class="recommend-status" role="note">국내 전체 검색은 금융위원회/KRX 키가 필요합니다. 코스피·코스닥 일별 자료를 기준으로 검색합니다.</p>
           <button type="button" id="recommendDiagnose" class="recommend-diag-button">KRX 운영 API 연결 진단 (인증키 비공개)</button>
           <div id="recommendDiagnosis" class="recommend-diagnosis" role="status" aria-live="polite" hidden></div>
-          <div id="recommendNumbers" class="recommend-numbers" hidden></div>
-          <div id="recommendResults" class="recommend-results" aria-live="polite"></div>
+          </section></div>
+          <section id="v6FullResults" class="v6-result-block" aria-label="전체 시장 결과"><h3>전체 시장 결과</h3><div id="recommendNumbers" class="recommend-numbers" hidden></div><div id="recommendResults" class="recommend-results" aria-live="polite"></div></section>
+          <section id="v6PatternResults" class="v6-result-block" aria-label="신호패턴 결과"><h3>신호패턴 결과</h3><div id="patternResults" class="recommend-results" aria-live="polite"></div></section>
+          <details id="popularPanel" class="popular-expander"><summary>★ 인기종목 · 네이버 인기순위 / NOVA TOP 20</summary>
+            <div class="popular-details">
+          <div class="section-title-row"><div><span class="eyebrow">MARKET ACTIVITY · KOSPI / KOSDAQ</span><h2 id="popularTitle">인기종목</h2></div><span class="tiny-tag">국내 전용</span></div>
+          <p class="subline">인기종목에는 서로 다른 두 기준이 있어요. <b>네이버 인기종목</b>은 네이버 공식 페이지에서 확인하고, <b>NOVA 시장 활발 종목</b>은 이용 가능한 공식 일별 시세로 산출합니다. 서로 같은 순위가 아닙니다.</p>
+          <a class="popular-naver-link" href="https://stock.naver.com/market/stock/kr/stocklist/top" target="_blank" rel="noopener noreferrer">네이버 증권 실제 인기종목 열기 ↗</a>
+          <div class="popular-section-head"><strong>NOVA 시장 활동 TOP 20</strong><span>조회 인기 아님 · 매수추천 아님</span></div>
+          <label class="field-label" for="popularSource">시세 출처</label>
+          <select id="popularSource" class="field-input"><option value="auto">자동 (금융위원회 우선)</option><option value="fsc">금융위원회 T+1 장 마감</option><option value="krx">KRX 장 마감</option></select>
+          <label class="field-label" for="popularMarket">시장</label>
+          <select id="popularMarket" class="field-input"><option value="all">코스피 + 코스닥</option><option value="kospi">코스피</option><option value="kosdaq">코스닥</option></select>
+          <label class="field-label" for="popularKind">순위 기준</label>
+          <select id="popularKind" class="field-input"><option value="turnover">거래대금 상위</option><option value="volume">거래량 상위 (급증률 아님)</option><option value="gainers">당일 상승률 상위</option></select>
+          <button type="button" class="primary-button recommend-run" id="popularLoad">시장 활동 순위 조회</button>
+          <p class="recommend-status" id="popularStatus" role="status" aria-live="polite">네이버 인기종목은 위 공식 링크에서 볼 수 있습니다. NOVA 순위는 FSC 또는 KRX 데이터 사용 설정이 필요합니다.</p>
+          <p class="note">NOVA 순위는 <b>최근 이용 가능한 장 마감 자료</b>입니다. 현재가·실시간 인기·상승 확률이 아닙니다. API 접근/재이용 권한이 확보된 개인 연구용으로 사용하세요.</p>
+          <div id="popularResults" class="popular-results" aria-live="polite"></div>
+            </div>
+          </details>
           <section class="v45-flow-panel" aria-labelledby="flowTitle">
             <div class="section-title-row"><div><span class="eyebrow">INVESTOR FLOWS & INTRADAY · V4.5</span><h3 id="flowTitle">투자자 수급 · 장중 가격</h3></div><span class="tiny-tag">KIS + 네이버 수급</span></div>
             <p class="subline">외국인·기관·개인 순매수는 KIS 또는 네이버 공개 자료로 조회합니다. 장중 현재가·분봉은 KIS 키가 필요합니다. 주가 갱신은 <b>20초 REST 재조회</b>이며 실시간 체결 스트림은 아닙니다. 과거 v4.4 백테스트 및 추천 점수에는 반영되지 않습니다.</p>
@@ -415,7 +431,7 @@
             <p>권장 경로: 공공데이터포털의 <b>금융위원회_주식시세정보</b>를 활용 신청하고, Render에 <code>FSC_STOCK_API_KEY</code>로 발급된 공공데이터포털 인증키를 입력하세요. KRX 키와 다릅니다. https://www.data.go.kr/data/15094808/openapi.do</p>
             <p>금융위원회 시세는 <b>다음 영업일 오후 1시 이후</b>에 업데이트되는 지연 데이터입니다. 과거 봉 기준일 불일치 시 매수 추천을 보류하며, 모든 심층 조건을 통과한 후보가 없으면 결과는 0개입니다. 공공누리 제4유형과 원천 데이터의 재배포 제한을 준수해야 합니다.</p>
             <p>KRX OPEN API에서 <b>인증키 발급</b> 및 <b>유가증권 일별매매정보·코스닥 일별매매정보 서비스 이용 승인</b>을 받으세요. Render의 Environment에 이름 <code>KRX_API_KEY</code>로 키를 저장합니다. API 키를 채팅이나 GitHub에 입력하지 마세요.</p>
-            <p>KRX 선택 시에는 장 마감 후 제공되는 일별 자료 기준이며 실시간 전체 시장 감시가 아닙니다. 오늘 자료가 아직 게시되지 않으면 직전 거래일로 조회합니다. 1차는 거래대금·규모·당일 가격 변동만 검토하고, 최대 8개 후보만 KIS 및 OpenDART로 심층 분석합니다.</p>
+            <p>KRX 선택 시에는 장 마감 후 제공되는 일별 자료 기준이며 실시간 전체 시장 감시가 아닙니다. 오늘 자료가 아직 게시되지 않으면 직전 거래일로 조회합니다. 1차는 거래대금·규모·당일 가격 변동만 검토하고, 설정한 24·48·60개 범위에서 KIS 및 OpenDART로 심층 분석합니다.</p>
             <p><a href="https://openapi.krx.co.kr/" target="_blank" rel="noopener noreferrer">KRX 공식 OPEN API 열기 ↗</a></p>
           </details>
           <p class="note">모든 종목을 상세 분석하거나 실시간 매수 기회를 포착한다고 보장하지 않습니다. 1차 전체 검색과 2차 일부 후보 분석의 범위가 다릅니다. 시세·인증 오류가 발생하면 추천을 만들어내지 않으며 결과는 서버 재시작 시 초기화됩니다. 자동 매매 주문 없음.</p>
@@ -517,15 +533,16 @@
   </div>
   <nav class="bottom-nav" aria-label="메뉴">
   <div id="v5MoreMenu" class="v5-more-menu" hidden>
+    <button type="button" class="nav-item" data-view="backtest">▤ <span>과거 검증</span></button>
+    <button type="button" class="nav-item" data-view="research">◇ <span>AI 연구실</span></button>
     <button type="button" class="nav-item" data-view="finance">▥ <span>재무·공시</span></button>
     <button type="button" class="nav-item" data-view="news">▣ <span>종목뉴스</span></button>
     <button type="button" class="nav-item" data-view="guide">? <span>사용방법</span></button>
   </div>
-  <div class="bottom-nav-inner v5-six-nav">
+  <div class="bottom-nav-inner v6-five-nav">
+    <button type="button" class="nav-item" data-view="home"><span class="nav-icon">⌂</span><span>홈</span></button>
     <button type="button" class="nav-item active" data-view="analyze"><span class="nav-icon">⌁</span><span>분석</span></button>
     <button type="button" class="nav-item" data-view="recommendations"><span class="nav-icon">⌕</span><span>추천</span></button>
-    <button type="button" class="nav-item" data-view="backtest"><span class="nav-icon">▤</span><span>검증</span></button>
-    <button type="button" class="nav-item" data-view="research"><span class="nav-icon">◇</span><span>연구</span></button>
     <button type="button" class="nav-item" data-view="watchlist"><span class="nav-icon">☆</span><span>관심</span></button>
     <button type="button" class="nav-item" id="v5MoreNav" aria-expanded="false" aria-controls="v5MoreMenu"><span class="nav-icon">☰</span><span>더보기</span></button>
   </div>
@@ -539,8 +556,8 @@
 <p class="field-help">휴대폰의 사이트 데이터를 삭제하거나 30일이 지나면 다시 인증이 필요합니다. KIS 앱 키는 서버에만 설정합니다.</p><label class="toggle-row"><input type="checkbox" id="autoRefresh"><span>60초마다 자동 재조회</span></label><p class="field-help">브라우저가 열려 있을 때만 실행하며, API 호출 제한에 영향을 받을 수 있습니다.</p><button type="button" id="installButton" class="secondary-button">홈 화면에 앱으로 설치 / 설치 안내</button><p class="field-help">PWA 설치는 HTTPS 주소 또는 서버의 localhost에서 지원됩니다. PC의 일반 HTTP 사설 IP는 설치 조건을 충족하지 않을 수 있습니다.</p></div><button type="button" id="saveSettings" class="primary-button wide">로그인 / 설정 적용</button></form></dialog>
   <script src="/static/ops_diagnostics.js" defer></script>
   <script src="/static/candles.js?v=__NOVA_APP_VERSION__" defer></script>
-  <script src="/static/v5_dashboard.js" defer></script>
-  <script src="/static/app.js" defer></script>
+  <script src="/static/v5_dashboard.js?v=__NOVA_APP_VERSION__" defer></script>
+  <script src="/static/app.js?v=__NOVA_APP_VERSION__" defer></script>
   <script src="/static/journal.js" defer></script>
   <script src="/static/monitor.js" defer></script>
   <script src="/static/news.js" defer></script>
