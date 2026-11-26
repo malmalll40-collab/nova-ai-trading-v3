@@ -643,7 +643,7 @@ async function liveButton(){
 }
 function onViewChange(view){
  const menu=byId('v5MoreMenu'),more=byId('v5MoreNav');
- if(menu)menu.hidden=true;if(more){more.setAttribute('aria-expanded','false');more.classList.toggle('active',['finance','news','guide'].includes(view));}
+ if(menu)menu.hidden=true;if(more){more.setAttribute('aria-expanded','false');more.classList.toggle('active',['backtest','research','finance','news','guide'].includes(view));}
  if(view!=='research'&&socket)stopSocket('종목 분석 화면을 벗어나 실시간 관찰을 종료했습니다.');
 }
 function renderV570(d){
