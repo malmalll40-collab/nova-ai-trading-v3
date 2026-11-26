@@ -28,6 +28,7 @@ def test_service_worker_release_cache_is_dynamic():
     js=r.body.decode('utf-8')
     assert '__NOVA_APP_VERSION__' not in js
     assert 'v585-pattern-ui-app-'+APP_VERSION in js
+    assert 'v585-pattern-ui-app-'+APP_VERSION+'-krx-date-probe-20261127' in js
     assert r.headers['cache-control']=='no-store'
     assert r.headers['service-worker-allowed']=='/'
     assert '/api/' in js and '/healthz' in js
