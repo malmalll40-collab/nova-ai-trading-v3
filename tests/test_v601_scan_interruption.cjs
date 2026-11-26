@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),test=require('node:test');
 const original=fs.readFileSync('static/recommendations.js','utf8');
-const source=original.replace('window.NOVAScanner={onViewChange,load:fetchState};','window.NOVAScanner={reconcile,remember,clearInterruption,tracked};');
+const source=original.replace('window.NOVAScanner={onViewChange,load:fetchState};','window.NOVAScanner={reconcile,remember,clearInterruption,tracked,setSearchState};');
 const A='0123456789abcdef',B='abcdef0123456789';
 function setup(store=new Map()){
   const ctx={window:{addEventListener(){}},document:{readyState:'loading'},sessionStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)}};
@@ -37,4 +37,21 @@ test('invalid identifiers and unconfirmed snapshots do not erase tracked job',()
   assert.equal(api.reconcile('pattern',{status:'UNKNOWN'}),false);
   assert.equal(api.reconcile('pattern',{status:'complete',job_id:'invalid'}),false);
   assert.equal(store.get('nova-scan-active-pattern'),A);
+});
+
+test('interrupted search is announced distinctly and allows manual retry',()=>{
+  const nodes=new Map();
+  const doc={readyState:'loading',getElementById(id){
+    if(!nodes.has(id))nodes.set(id,{dataset:{},style:{},setAttribute(){},removeAttribute(){}});
+    return nodes.get(id);
+  }};
+  const ctx={window:{addEventListener(){}},document:doc};
+  vm.runInNewContext(source,ctx);
+  ctx.window.NOVAScanner.setSearchState('idle',{interrupted:true,message:'완료 여부 미확인'});
+  assert.equal(nodes.get('recommendScanState').dataset.state,'interrupted');
+  assert.equal(nodes.get('recommendScanLabel').textContent,'이전 검색 완료 미확인');
+  assert.equal(nodes.get('recommendScan').disabled,false);
+  ctx.window.NOVAScanner.setSearchState('running',{interrupted:true});
+  assert.equal(nodes.get('recommendScanState').dataset.state,'running');
+  assert.equal(nodes.get('recommendScan').disabled,true);
 });
