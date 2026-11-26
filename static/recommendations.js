@@ -243,20 +243,22 @@
     if(preview){out.hidden=false;out.textContent='체험판에서는 실제 KRX 연결을 진단하지 않습니다.';return;}
     btn.disabled=true;out.hidden=false;out.replaceChildren();out.textContent='KRX 운영 API를 코스피·코스닥별로 확인 중입니다…';
     try{
-      const resp=await fetch('/api/recommendations/diagnose',{method:'POST',headers:headers(),cache:'no-store'});
+      const date=$('recommendDiagnoseDate')?.value||'';
+      const endpoint='/api/recommendations/diagnose'+(date?'?basis_date='+encodeURIComponent(date):'');
+      const resp=await fetch(endpoint,{method:'POST',headers:headers(),cache:'no-store'});
       const d=await resp.json().catch(()=>({}));
       if(!resp.ok)throw new Error(typeof d.detail==='string'?d.detail:`진단 요청 실패 HTTP ${resp.status}`);
       out.replaceChildren();
-      const top=document.createElement('p');top.textContent=`운영 API 진단 기준일: ${d.date||'미설정'} · 인증키: ${d.configured?'서버에 설정됨':'미설정'}`;out.append(top);
+      const top=document.createElement('p');top.textContent=`검사 기준일: ${(d.checked_dates||[]).join(', ')||d.date||'미설정'} · 인증키: ${d.configured?'서버에 설정됨':'미설정'}`;out.append(top);
       for(const item of d.results||[]){
         const itemNode=document.createElement('p');
         const m=item.market==='kospi'?'코스피':'코스닥';
-        const statusLabel=item.state==='success'?'정상 수신':item.state==='no_data'?'자료 없음':item.state==='auth_denied'?'인증/권한 실패':'연결 실패';
+        const statusLabel=item.state==='success'?'종목 행 수신 (정합성 별도 검증)':item.state==='no_data'?'빈 응답 (게시 지연·휴장 등 원인 미확정)':item.state==='auth_denied'?'인증/권한 실패':'연결 실패';
         const count=item.record_count!=null?` · 종목 ${item.record_count}건`:'';
-        itemNode.textContent=`${m} (${item.api_id||'서비스'}): ${statusLabel} · HTTP ${item.http_status??'미확인'} · KRX 코드 ${item.krx_code??'없음'}${count} · ${item.detail||'원인 미확인'}`;
+        itemNode.textContent=`${item.date||d.date||'기준일 미확인'} · ${m} (${item.api_id||'서비스'}): ${statusLabel} · HTTP ${item.http_status??'미확인'} · KRX 코드 ${item.krx_code??'없음'}${count} · ${item.detail||'원인 미확인'}`;
         out.append(itemNode);
       }
-      const note=document.createElement('small');note.textContent='요청: 운영 API · GET · AUTH_KEY 헤더 전송(값 비공개). 인증 오류면 Render 개인 키 및 두 서비스 이용 승인을 확인하세요. 샘플 API 성공만으로 운영 인증은 확인되지 않습니다.';out.append(note);
+      const note=document.createElement('small');note.textContent='요청: 운영 API · GET · AUTH_KEY 헤더 전송(값 비공개). 인증 오류면 Render 개인 키 및 두 서비스 이용 승인을 확인하세요. HTTP 200의 빈 응답은 실제 데이터 확보 성공이 아닙니다. 수집·수정주가 검증은 별도입니다. 샘플 API 성공만으로 운영 인증은 확인되지 않습니다.';out.append(note);
     }catch(err){out.textContent=err.message||'진단을 수행할 수 없습니다.';}
     finally{btn.disabled=false;}
   }
