@@ -17,6 +17,10 @@ def test_served_index_release_and_discovery():
     assert 'NOVA v'+APP_VERSION+' · 실거래 주문 없음' in html
     assert 'NOVA v5.7.0 · EVIDENCE FIRST' in html
     assert 'id="patternMenu"' in html
+    assert 'id="patternMenuBody">' in html
+    assert 'id="patternMenuToggle"' not in html
+    for asset in ('pattern_research.js','recommendations.js'):
+        assert '/static/'+asset+'?v='+APP_VERSION+'"' in html
     assert r.headers['cache-control']=='no-cache'
 
 def test_service_worker_release_cache_is_dynamic():
@@ -27,3 +31,6 @@ def test_service_worker_release_cache_is_dynamic():
     assert r.headers['cache-control']=='no-store'
     assert r.headers['service-worker-allowed']=='/'
     assert '/api/' in js and '/healthz' in js
+    assert "const RELEASE='"+APP_VERSION+"'" in js
+    assert 'INSTALL_FILES' in js and "cache:'reload'" in js
+    assert 'cache.match(e.request)' in js
