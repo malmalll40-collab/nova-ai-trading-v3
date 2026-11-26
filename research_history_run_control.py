@@ -36,13 +36,14 @@ def exclusive_run(dsn, *, session_mode_confirmed=False, connect=None):
             def alive():
                 # A lost/replaced session cannot continue claiming the lock.
                 try:
-                    cur.execute('SELECT pg_backend_pid()')
-                    return cur.fetchone()==(pid,)
+                    cur.execute("SELECT pg_backend_pid(), EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND pid=pg_backend_pid() AND classid=0 AND objid=%s AND objsubid=1 AND granted AND mode='ExclusiveLock')",(LOCK_KEY,))
+                    return cur.fetchone()==(pid,True)
                 except Exception:
                     return False
             try:
                 cur.execute('SELECT pg_backend_pid()')
                 pid=cur.fetchone()[0]
+                if not alive():raise RuntimeError('RUN_LOCK_LOST')
                 @contextmanager
                 def transaction():
                     # Use the very session that owns the advisory lock. If it dies,

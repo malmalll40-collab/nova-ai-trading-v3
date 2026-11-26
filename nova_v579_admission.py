@@ -39,6 +39,11 @@ def admission_reason(proof,now,*,foreground,physical,research,errors,overflow,st
     except (AttributeError,TypeError,ValueError):return 'ACCOUNT_QUOTA_UNVERIFIED'
     if not 0<=age<=MAX_PROOF_AGE:return 'ACCOUNT_QUOTA_STALE'
     if type(proof.physical_headroom) is not int or proof.physical_headroom<MIN_HEADROOM:return 'QUOTA_HEADROOM_LOW'
+    return local_admission_reason(foreground=foreground,physical=physical,research=research,
+        errors=errors,overflow=overflow,starts=starts,monotonic_now=monotonic_now)
+
+
+def local_admission_reason(*,foreground,physical,research,errors,overflow,starts,monotonic_now):
     if foreground:return 'FOREGROUND_BUSY'
     if research or physical:return 'PHYSICAL_REQUEST_BUSY'
     if overflow or errors:return 'PROVIDER_UNHEALTHY'
@@ -82,16 +87,23 @@ class ResearchHistoryClient:
         if self._proof is None:raise ResearchBlocked('ACCOUNT_QUOTA_UNVERIFIED')
         try:proof=self._proof()
         except Exception:raise ResearchBlocked('ACCOUNT_QUOTA_UNVERIFIED') from None
+        k=self._kis
+        if not k.token:raise ResearchBlocked('TOKEN_UNAVAILABLE')
         with self._telemetry.research_attempt(proof):
             try:
-                k=self._kis
-                if not k.token:raise ResearchBlocked('TOKEN_UNAVAILABLE')
                 r=k.session.get(k.BASE+path,headers={'authorization':f'Bearer {k.token}',
                     'appkey':k.key,'appsecret':k.secret,'tr_id':tr_id,'custtype':'P',
-                    'content-type':'application/json; charset=utf-8'},params=params,timeout=TIMEOUT)
-                if not 200<=int(r.status_code)<300:raise ResearchBlocked('RESEARCH_HTTP_FAILURE')
-                data=r.json()
-                if not isinstance(data,dict) or data.get('rt_cd')!='0':raise ResearchBlocked('RESEARCH_PAYLOAD_FAILURE')
-                return data
-            except ResearchBlocked:raise
+                    'content-type':'application/json; charset=utf-8'},params=params,timeout=TIMEOUT,
+                    allow_redirects=False)
             except Exception:raise ResearchBlocked('RESEARCH_PROVIDER_FAILURE') from None
+        try:
+            if not 200<=int(r.status_code)<300:raise ResearchBlocked('RESEARCH_HTTP_FAILURE')
+            data=r.json()
+            if not isinstance(data,dict) or data.get('rt_cd')!='0':raise ResearchBlocked('RESEARCH_PAYLOAD_FAILURE')
+            return data
+        except ResearchBlocked:
+            self._telemetry.failure()
+            raise
+        except Exception:
+            self._telemetry.failure()
+            raise ResearchBlocked('RESEARCH_PROVIDER_FAILURE') from None

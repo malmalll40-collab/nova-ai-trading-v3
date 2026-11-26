@@ -40,6 +40,13 @@ class LocalTelemetry:
         finally:
             with self._lock:self._active-=1
 
+    def install_shared_gate(self,gate):
+        # Only startup, before accepting requests. Never swap active gates.
+        with self._lock:
+            if self._shared_gate is not None or self._active or self._physical_active or self._total:
+                raise RuntimeError('SHARED_GATE_INSTALL_UNSAFE')
+            self._shared_gate=gate
+
     def _shared_slot(self,kind):
         # No production installation. The same gate must cover every physical
         # consumer before any account-wide evidence can be trusted.
@@ -63,13 +70,18 @@ class LocalTelemetry:
                 with self._lock:self._physical_active-=1
 
     def _research_reason(self,proof,now):
-        from nova_v579_admission import admission_reason
+        from nova_v579_admission import admission_reason,local_admission_reason
+        from research_kis_transport_gate import LocalPolicyPermit
         self._prune(self._attempts,now);self._prune(self._errors,now)
         self._prune(self._research_attempts,now)
-        return admission_reason(proof,self._wall(),foreground=self._active,
-            physical=self._physical_active,research=self._research_active,
-            errors=len(self._errors),overflow=now<self._overflow_until,
-            starts=tuple(self._research_attempts),monotonic_now=now)
+        state=dict(foreground=self._active,physical=self._physical_active,
+            research=self._research_active,errors=len(self._errors),
+            overflow=now<self._overflow_until,starts=tuple(self._research_attempts),monotonic_now=now)
+        if isinstance(proof,LocalPolicyPermit):
+            if self._shared_gate is None or not self._shared_gate.accepts(proof):
+                return 'ACCOUNT_QUOTA_UNVERIFIED'
+            return local_admission_reason(**state)
+        return admission_reason(proof,self._wall(),**state)
 
     @contextmanager
     def research_attempt(self,proof):
