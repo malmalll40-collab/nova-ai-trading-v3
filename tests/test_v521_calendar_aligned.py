@@ -1,4 +1,5 @@
 """NOVA v5.2.1: KRX diagnostics and comparable exit-policy research."""
+from nova_release import APP_VERSION
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -92,7 +93,7 @@ def test_aligned_no_trade_not_mislabelled_safe():
 
 def test_v521_ui_and_batch_integration():
     import server
-    assert server.healthz()['app_version']=='5.7.0'
+    assert server.healthz()['app_version']==APP_VERSION
     html=(server.ASSETS/'index.html').read_text()
     js=(server.ASSETS/'v5_dashboard.js').read_text()
     assert 'id="v521AlignedCards"' in html and 'id="v521FilterSummary"' in html
