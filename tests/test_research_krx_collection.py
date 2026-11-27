@@ -105,3 +105,22 @@ def test_schema_failure_keeps_claim():
 def test_default_disabled(monkeypatch):
     monkeypatch.delenv(rc.FLAG,raising=False)
     assert rc.start_if_enabled(None,None) is False
+
+
+def test_pilot_independent_window_preserves_foreground_and_calendar_guards():
+    from ops_preflight import JOBS
+    s={'quiet_window':False,'calendar_verified':True,'krx_regular_status':'OPEN',
+       'jobs':dict.fromkeys(JOBS,'idle'),'window_overflow':False,
+       'kis_load':dict.fromkeys(('foreground_active','physical_active','research_active',
+                                 'recent_provider_errors','physical_attempts_60s'),0)}
+    assert rc.collection_eligible(s,rc.PILOT_MODE)
+    assert not rc.collection_eligible(s,rc.BATCH_MODE)
+    assert not rc.collection_eligible(s,'unknown')
+    assert rc.collection_eligible({**s,'quiet_window':True},rc.BATCH_MODE)
+    for patch in ({'calendar_verified':False},{'krx_regular_status':'UNKNOWN'},
+                  {'window_overflow':True},{'jobs':{}},
+                  {'jobs':{**s['jobs'],'scan_full':'running'}}):
+        assert not rc.collection_eligible({**s,**patch},rc.PILOT_MODE)
+    for k in s['kis_load']:
+        for value in (1,None):
+            assert not rc.collection_eligible({**s,'kis_load':{**s['kis_load'],k:value}},rc.PILOT_MODE)
