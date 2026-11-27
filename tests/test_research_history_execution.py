@@ -67,3 +67,22 @@ def test_lost_run_lock_blocks_before_network():
     paced.bind_lock(lambda:False)
     with pytest.raises(ResearchBlocked,match='RUN_ADMISSION_REVOKED'):
         paced.get('a','b',{})
+
+
+def test_execution_admits_completed_history_during_open_session():
+    from research_history_status import END
+    from datetime import timedelta
+    midday=datetime.combine(END+timedelta(days=1),datetime.min.time(),tzinfo=KST).replace(hour=12)
+    schedule={**SCHEDULE,'status':'OPEN'}
+    coordinator=SimpleNamespace(available=lambda:True,reserve=lambda:None)
+    def runner(*args,**kwargs):
+        assert kwargs['admission']()
+        return {'status':'PARTIAL','new_rows':0}
+    r=execute('fake',kis=SimpleNamespace(token='fixture'),telemetry=None,coordinator=coordinator,
+              session_mode_confirmed=True,now=lambda:midday,calendar=lambda t:schedule,runner=runner,
+              historical_calendar=lambda a,b:[a,b])
+    assert r['status']=='PARTIAL'
+    r=execute('fake',kis=SimpleNamespace(token='fixture'),telemetry=None,coordinator=coordinator,
+              session_mode_confirmed=True,now=lambda:midday,calendar=lambda t:{**schedule,'calendar_verified':False},
+              runner=lambda *a,**k:pytest.fail('must not run'))
+    assert r['reason']=='RUN_ADMISSION_UNVERIFIED'

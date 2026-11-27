@@ -55,6 +55,20 @@ def quiet_window(now,schedule):
     return here<=walltime(7,45) or here>=walltime(20,10)
 
 
+def historical_window(now,schedule):
+    """Past-session research only; no wall-clock restriction.
+    Unknown calendars or inconsistent session metadata remain blocked.
+    The caller must separately prove target dates are already completed,
+    and enforce its own foreground, provider and database admission.
+    """
+    if now.tzinfo is None or schedule.get('calendar_verified') is not True:return False
+    status=schedule.get('status')
+    if status not in ('OPEN','CLOSED'):return False
+    has_open=bool(schedule.get('open_kst'))
+    has_close=bool(schedule.get('close_kst'))
+    return has_open==has_close and (status!='OPEN' or has_open)
+
+
 class GuardedBudget(Budget):
     def __init__(self,guard,**kw):
         super().__init__(**kw)

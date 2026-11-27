@@ -114,7 +114,7 @@ def test_pilot_independent_window_preserves_foreground_and_calendar_guards():
        'kis_load':dict.fromkeys(('foreground_active','physical_active','research_active',
                                  'recent_provider_errors','physical_attempts_60s'),0)}
     assert rc.collection_eligible(s,rc.PILOT_MODE)
-    assert not rc.collection_eligible(s,rc.BATCH_MODE)
+    assert rc.collection_eligible(s,rc.BATCH_MODE)
     assert not rc.collection_eligible(s,'unknown')
     assert rc.collection_eligible({**s,'quiet_window':True},rc.BATCH_MODE)
     for patch in ({'calendar_verified':False},{'krx_regular_status':'UNKNOWN'},
@@ -124,3 +124,35 @@ def test_pilot_independent_window_preserves_foreground_and_calendar_guards():
     for k in s['kis_load']:
         for value in (1,None):
             assert not rc.collection_eligible({**s,'kis_load':{**s['kis_load'],k:value}},rc.PILOT_MODE)
+
+
+def _idle_snapshot():
+    from ops_preflight import JOBS
+    return {'quiet_window':False,'calendar_verified':True,'krx_regular_status':'OPEN',
+            'jobs':dict.fromkeys(JOBS,'idle'),'window_overflow':False,
+            'kis_load':dict.fromkeys(('foreground_active','physical_active','research_active',
+                                      'recent_provider_errors','physical_attempts_60s'),0)}
+
+def test_pilot_admission_polls_local_state_until_idle():
+    import threading
+    good=_idle_snapshot()
+    busy={**good,'kis_load':{**good['kis_load'],'physical_attempts_60s':1}}
+    states=iter([busy,good]);waits=[];logs=[]
+    assert rc.await_admission(threading.Event(),lambda:next(states),rc.PILOT_MODE,
+           lambda n:waits.append(n) or False,lambda k,d:logs.append(d))
+    assert waits==[30]
+    assert logs[0]['reasons']==['PHYSICAL_ATTEMPTS_60S']
+    assert logs[1]['status']=='READY'
+
+def test_admission_bounded_for_both_modes():
+    import threading
+    good=_idle_snapshot()
+    busy={**good,'jobs':{**good['jobs'],'scan_full':'running'}}
+    for mode,n in ((rc.PILOT_MODE,11),(rc.BATCH_MODE,11)):
+        waits=[];logs=[]
+        assert not rc.await_admission(threading.Event(),lambda:busy,mode,
+               lambda t:waits.append(t) or False,lambda k,d:logs.append(d))
+        assert len(logs)==n and waits==[30]*(n-1)
+        assert all('JOB_BUSY_OR_UNKNOWN' in d['reasons'] for d in logs)
+    assert not rc.await_admission(threading.Event(),lambda:busy,rc.PILOT_MODE,
+                                  lambda n:True,lambda k,d:None)
