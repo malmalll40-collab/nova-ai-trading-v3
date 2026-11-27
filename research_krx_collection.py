@@ -1,6 +1,6 @@
 """Private KRX collection, independent of KIS adjusted data.
-Owner-enabled staged rollout. Pilot first, bounded resume only after verified
-pilot. No raw response logging, no orders or live model use. Successful
+Owner-enabled private research. A verified pilot can authorize either the
+legacy bounded pass or one finite full-history run. No raw response logging, no orders or live model use. Successful
 provider access plus strict cohort schema is required before storage.
 Uncertain dispatched claims remain held; no automatic repeat on errors.
 """
@@ -26,6 +26,11 @@ URLS={s:'https://data-dbg.krx.co.kr/svc/apis/'+('idx/' if s in ORDER[:2] else 's
 FLAG='NOVA_KRX_PRIVATE_COLLECTION'
 PILOT_MODE='pilot-20261120-v1'
 BATCH_MODE='bounded-history-v1'
+FULL_MODE='single-history-v1'
+MODES=(PILOT_MODE,BATCH_MODE,FULL_MODE)
+# Fixed manifest: at most 729 sessions x four approved daily services.
+# This is a run cap, NOT a claim of remaining account-wide daily quota.
+MAX_FULL_CALLS=2916
 CLAIMS='nova_krx_collection_claim_v1'
 MAX_BATCH_CALLS=12
 LOCK=601576049
@@ -119,22 +124,33 @@ def read_one(session,key,service,day):
 
 def plan(sessions,saved,mode):
     days=tuple(sessions)
-    if PILOT not in days or mode not in (PILOT_MODE,BATCH_MODE):raise ValueError('KRX_PLAN_INVALID')
+    if PILOT not in days or mode not in MODES:raise ValueError('KRX_PLAN_INVALID')
     first=[(s,PILOT) for s in ORDER if (s,PILOT.isoformat()) not in saved]
+    if mode==FULL_MODE and first:raise ValueError('KRX_PILOT_REQUIRED')
     if first or mode==PILOT_MODE:return first
-    return [(s,d) for d in reversed(days) if d!=PILOT for s in ORDER if (s,d.isoformat()) not in saved][:MAX_BATCH_CALLS]
+    tasks=[(s,d) for d in reversed(days) if d!=PILOT for s in ORDER if (s,d.isoformat()) not in saved]
+    if mode==FULL_MODE:
+        if len(days)*len(ORDER)>MAX_FULL_CALLS:raise ValueError('KRX_FULL_RUN_LIMIT')
+        return tasks
+    return tasks[:MAX_BATCH_CALLS]
 
-def collect(store,session,key,mode,ready,wait,emit):
+def collect(store,session,key,mode,ready,wait,emit,*,before_claim=None):
     def stop(reason):
         emit('krx_collection_stop',{**BASE,'reason':reason})
-    if not ready() or not key or mode not in (PILOT_MODE,BATCH_MODE):
+    if not ready() or not key or mode not in MODES:
         return stop('ADMISSION_BLOCKED')
     store.setup()
     info,saved,held=store.status()
     emit('krx_collection_coverage',{**BASE,**info})
     if held:return stop('UNRESOLVED_CLAIM')
-    tasks=plan(store.sessions,saved,mode)
+    try:tasks=plan(store.sessions,saved,mode)
+    except ValueError as exc:
+        reason=str(exc)
+        return stop(reason if reason in ('KRX_PILOT_REQUIRED','KRX_FULL_RUN_LIMIT') else 'KRX_PLAN_INVALID')
+    emit('krx_collection_plan',{**BASE,'mode':mode,'remaining_calls':len(tasks),
+                               'single_run':mode==FULL_MODE})
     for i,(service,day) in enumerate(tasks):
+        if before_claim is not None and not before_claim():return stop('FOREGROUND_OR_WINDOW_BUSY')
         if not ready():return stop('FOREGROUND_OR_WINDOW_BUSY')
         if not store.claim(service,day):return stop('SHARED_CLAIM_BLOCKED')
         if not ready():return stop('WINDOW_CHANGED_AFTER_CLAIM')
@@ -148,7 +164,7 @@ def collect(store,session,key,mode,ready,wait,emit):
             # Exact service and day, actual successful provider response,
             # explicitly enabled private collection only. No default True.
             n=store.save(service,day,payload,authorized=lambda s,d:
-                mode in (PILOT_MODE,BATCH_MODE) and state=='success' and (s,d)==(service,day))
+                mode in MODES and state=='success' and (s,d)==(service,day))
         except ValueError as exc:
             # save transaction rolled back, uncertain claim remains held
             code=str(exc)
@@ -158,13 +174,14 @@ def collect(store,session,key,mode,ready,wait,emit):
         if i+1<len(tasks) and wait(PACE):return stop('STOP_REQUESTED')
     info,_,_=store.status()
     emit('krx_collection_coverage',{**BASE,**info})
-    return stop('BOUNDED_PASS_COMPLETE')
+    return stop('FULL_RUN_COMPLETE' if mode==FULL_MODE and info.get('status')=='COVERAGE_COMPLETE' else
+                'FULL_RUN_EXHAUSTED' if mode==FULL_MODE else 'BOUNDED_PASS_COMPLETE')
 
 def collection_eligible(s, mode):
     """Completed historical dates only; both modes use idle admission.
     Calls remain sequential and bounded, with a durable claim before I/O.
     """
-    if mode not in (PILOT_MODE,BATCH_MODE):return False
+    if mode not in MODES:return False
     recent=s.get('kis_load',{}).get('physical_attempts_60s')
     return type(recent) is int and recent==0 and historical_eligible(s)
 
@@ -177,7 +194,7 @@ def admission_reasons(s, mode):
     if not isinstance(s,dict):return ['SNAPSHOT_UNAVAILABLE']
     reasons=[]
     if s.get('calendar_verified') is not True:reasons.append('CALENDAR_UNVERIFIED')
-    if mode in (PILOT_MODE,BATCH_MODE) and s.get('krx_regular_status') not in ('OPEN','CLOSED'):
+    if mode in MODES and s.get('krx_regular_status') not in ('OPEN','CLOSED'):
         reasons.append('MARKET_STATUS_UNKNOWN')
     jobs=s.get('jobs') or {}
     if set(jobs)!=set(JOBS) or any(v not in TERMINAL for v in jobs.values()):
@@ -185,18 +202,18 @@ def admission_reasons(s, mode):
     if s.get('window_overflow') is not False:reasons.append('TELEMETRY_OVERFLOW_OR_UNKNOWN')
     load=s.get('kis_load') or {}
     counters=['foreground_active','physical_active','research_active','recent_provider_errors']
-    if mode in (PILOT_MODE,BATCH_MODE):counters.append('physical_attempts_60s')
+    if mode in MODES:counters.append('physical_attempts_60s')
     for key in counters:
         if type(load.get(key)) is not int or load[key]!=0:
             reasons.append(key.upper())
-    if mode not in (PILOT_MODE,BATCH_MODE):reasons.append('INVALID_MODE')
+    if mode not in MODES:reasons.append('INVALID_MODE')
     return reasons
 
 def await_admission(stop,snapshot,mode,wait,emit):
     """Poll local readiness only before any DB claim or provider request.
     No automatic retry of dispatched, failed, or uncertain KRX calls.
     """
-    checks=PILOT_IDLE_CHECKS if mode in (PILOT_MODE,BATCH_MODE) else 1
+    checks=PILOT_IDLE_CHECKS if mode in MODES else 1
     for attempt in range(1,checks+1):
         if stop.is_set():return False
         try:
@@ -230,13 +247,16 @@ def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,s
             return emit('krx_collection_stop',{**BASE,'reason':'HISTORY_NOT_COMPLETED'})
         store=store_factory(dsn,days)
         with session_factory() as session:
-            collect(store,session,key,mode,ready,wait,emit)
+            # Poll only local readiness between requests; no extra KRX calls.
+            # A held or failed durable claim is never retried automatically.
+            before=(lambda:ready() or await_admission(stop,snapshot,mode,wait,emit)) if mode==FULL_MODE else None
+            collect(store,session,key,mode,ready,wait,emit,before_claim=before)
     except Exception:
         emit('krx_collection_stop',{**BASE,'reason':'COLLECTION_OR_CHECKPOINT_FAILED'})
 
 def start_if_enabled(stop,snapshot):
     mode=os.getenv(FLAG)
-    if mode not in (PILOT_MODE,BATCH_MODE):return False
+    if mode not in MODES:return False
     threading.Thread(target=worker,args=(stop,snapshot,os.getenv('DATABASE_URL','').strip(),
         os.getenv('KRX_API_KEY','').strip(),mode),daemon=True,name='nova-krx-private-collector').start()
     return True

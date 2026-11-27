@@ -156,3 +156,42 @@ def test_admission_bounded_for_both_modes():
         assert all('JOB_BUSY_OR_UNKNOWN' in d['reasons'] for d in logs)
     assert not rc.await_admission(threading.Event(),lambda:busy,rc.PILOT_MODE,
                                   lambda n:True,lambda k,d:None)
+
+
+def test_full_run_all_missing_no_batch_cap_and_requires_pilot():
+    from datetime import timedelta
+    days=tuple(rc.PILOT+timedelta(days=i) for i in range(729))
+    saved={(s,rc.PILOT.isoformat()) for s in rc.ORDER}
+    tasks=rc.plan(days,saved,rc.FULL_MODE)
+    assert len(tasks)==2912 and len(set(tasks))==2912
+    assert rc.plan(days,saved|{(s,d.isoformat()) for s,d in tasks},rc.FULL_MODE)==[]
+    with pytest.raises(ValueError,match='KRX_PILOT_REQUIRED'):
+        rc.plan(days,set(),rc.FULL_MODE)
+    with pytest.raises(ValueError,match='KRX_FULL_RUN_LIMIT'):
+        rc.plan(days+(days[-1]+timedelta(days=1),),saved,rc.FULL_MODE)
+
+
+def test_full_run_crosses_legacy_batch_limit_and_saves_each_once():
+    from datetime import timedelta
+    store=Store()
+    store.sessions=tuple(rc.PILOT+timedelta(days=i) for i in range(5))
+    store.saved={(s,rc.PILOT.isoformat()) for s in rc.ORDER}
+    s=Session([Response({'OutBlock_1':[{'fixture':1}]}) for _ in range(16)])
+    logs=[]
+    rc.collect(store,s,'fixture',rc.FULL_MODE,lambda:True,lambda n:False,
+               lambda e,d:logs.append((e,d)),before_claim=lambda:True)
+    assert len(s.calls)==16 and len(store.saved)==20 and not store.held
+    assert logs[-1][1]['reason']=='FULL_RUN_EXHAUSTED'
+    run(store,s,rc.FULL_MODE)
+    assert len(s.calls)==16
+
+
+def test_full_run_pauses_before_claim_without_provider_calls():
+    store=Store()
+    store.saved={(s,rc.PILOT.isoformat()) for s in rc.ORDER}
+    s=Session([]);logs=[]
+    rc.collect(store,s,'fixture',rc.FULL_MODE,lambda:True,lambda n:False,
+               lambda e,d:logs.append((e,d)),before_claim=lambda:False)
+    assert not s.calls and not store.held and not store.calls
+    assert logs[-1][1]['reason']=='FOREGROUND_OR_WINDOW_BUSY'
+    assert rc.collection_eligible(_idle_snapshot(),rc.FULL_MODE)
