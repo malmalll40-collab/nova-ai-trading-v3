@@ -2,15 +2,32 @@
 import io
 import json
 import os
-from datetime import date, timedelta
+from datetime import date
 import zipfile
 
 import psycopg
 
-from research_history_checkpoint import canonical, digest
-from research_krx_bulk import SourceError
+from research_krx_bulk import INDEX_FIELDS, INDEX_NAMES, MARKETS, SERVICES, STOCK_FIELDS, SourceError, select_rows
 from research_krx_bulk_store import BARS, LOCK, STAGE, download, initialize, publish, stage, step
-from tests.test_research_krx_bulk import raw_day
+
+
+def raw_day(day):
+    rows = []
+    for service, symbols in SERVICES.items():
+        for symbol in symbols:
+            index = service in INDEX_NAMES
+            row = {'BAS_DD': day.strftime('%Y%m%d')}
+            fields = INDEX_FIELDS if index else STOCK_FIELDS
+            for key, number in zip(('open', 'high', 'low', 'close', 'volume', 'turnover'),
+                                   ('100','104','98','103','1,200','123,600')):
+                row[fields[key]] = number
+            if index:
+                row['IDX_NM'] = '코스피' if symbol == '^KS11' else '코스닥'
+                row['CLSPRC_IDX'] = '102.37'
+            else:
+                row.update(ISU_CD=symbol[:6], ISU_NM='테스트', MKT_NM=MARKETS[service])
+            rows.extend(select_rows(service, day, {'OutBlock_1': [row]}))
+    return rows
 
 
 def main():
@@ -66,6 +83,38 @@ def main():
         with db.cursor() as cur:
             cur.execute(f'SELECT count(*) FROM {BARS} WHERE dataset=%s',(other_dataset,))
             assert cur.fetchone() == (0,)
+        from research_krx_period import STOCK, MARKET_FIELDS
+        from research_krx_bulk_store import complete_day, period_step
+        from research_krx_bulk import normalize
+        import unittest.mock as mock
+        mixed = 'bulk-period-fixture'
+        def period_reader(key, symbol, calendar, session):
+            if symbol.startswith('^'):
+                raise SourceError('FSC_AUTH_DENIED')
+            found = {}
+            for day in calendar:
+                for svc, raw in raw_day(day):
+                    bar = normalize(svc, raw, day)
+                    if bar['symbol'] == symbol:
+                        row = {'basDt':day.strftime('%Y%m%d'), 'srtnCd':symbol[:6],'itmsNm':'테스트','mrktCtg':bar['market']}
+                        row.update({field:str(bar[k]) for k,field in MARKET_FIELDS.items()})
+                        found[day.isoformat()] = row
+            return found
+        with mock.patch('research_krx_bulk_store.fetch_period',side_effect=period_reader) as ranges:
+            for _ in range(21):
+                assert period_step(db,mixed,days,'fixture')['status'] == 'PERIOD'
+            assert period_step(db,mixed,days,'fixture') is None and ranges.call_count == 21
+        class GapReader:
+            key = 'fixture'
+            def read(self, service, day):
+                assert service in INDEX_NAMES
+                return [pair for pair in raw_day(day) if pair[0] == service]
+        done = step(db,mixed,days,lambda day:complete_day(db,mixed,day,GapReader()))
+        assert done['published_rows'] == 66
+        with db.cursor() as cur:
+            report = zipfile.ZipFile(io.BytesIO(download(cur,mixed,days)))
+            sources = json.loads(report.read('validation.json'))['rows_per_source_service']
+            assert sources == {STOCK:60,'kospi_dd_trd':3,'kosdaq_dd_trd':3}
     print('KRX bulk PostgreSQL PASS: private staging, locks, rollback, replay, atomic COPY and verified export')
 
 

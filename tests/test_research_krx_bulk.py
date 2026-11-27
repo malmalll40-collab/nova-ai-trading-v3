@@ -7,41 +7,23 @@ import zipfile
 import pytest
 
 from research_history_checkpoint import canonical
-from research_krx_bulk import INDEX_FIELDS, INDEX_NAMES, MARKETS, SERVICES, STOCK_FIELDS, SourceError, archive, select_rows, validate_day
+from research_krx_bulk import SourceError, archive, select_rows, validate_day
+from integration_checks.krx_bulk_postgres import raw_day
 from research_krx_bulk_api import ticket_valid
 from research_krx_bulk_store import signature
 
 DAY = date(2026, 11, 25)
 
 
-def raw_day(day=DAY):
-    rows = []
-    for service, symbols in SERVICES.items():
-        for symbol in symbols:
-            index = service in INDEX_NAMES
-            row = {'BAS_DD': day.strftime('%Y%m%d')}
-            fields = INDEX_FIELDS if index else STOCK_FIELDS
-            for key, number in zip(('open', 'high', 'low', 'close', 'volume', 'turnover'),
-                                   ('100','104','98','103','1,200','123,600')):
-                row[fields[key]] = number
-            if index:
-                row['IDX_NM'] = '코스피' if symbol == '^KS11' else '코스닥'
-                row['CLSPRC_IDX'] = '102.37'
-            else:
-                row.update(ISU_CD=symbol[:6], ISU_NM='테스트', MKT_NM=MARKETS[service])
-            rows.extend(select_rows(service, day, {'OutBlock_1': [row]}))
-    return rows
-
-
 def test_full_index_fields_and_zero_padded_stock_identity():
-    result = validate_day(DAY, raw_day())
+    result = validate_day(DAY, raw_day(DAY))
     assert len(result) == 22
     assert result['^KS11'][0]['close'] == 102.37 and result['^KQ11'][0]['turnover'] == 123600
     assert result['000660.KS'][0]['code'] == '000660'
 
 
 def test_confirmed_zero_activity_and_missing_prices_are_preserved():
-    rows = raw_day()
+    rows = raw_day(DAY)
     row = next(r for s, r in rows if r.get('ISU_CD') == '086520')
     row.update(TDD_OPNPRC='-', TDD_HGPRC='0', TDD_LWPRC='0', ACC_TRDVOL='0', ACC_TRDVAL='0')
     bar, source = validate_day(DAY, rows)['086520.KQ']
@@ -50,7 +32,7 @@ def test_confirmed_zero_activity_and_missing_prices_are_preserved():
 
 
 def test_market_transfer_uses_real_historical_market():
-    rows = raw_day()
+    rows = raw_day(DAY)
     pair = next(x for x in rows if x[1].get('ISU_CD') == '086520')
     pair[0] = 'stk_bydd_trd'
     pair[1]['MKT_NM'] = 'KOSPI'
@@ -59,7 +41,7 @@ def test_market_transfer_uses_real_historical_market():
 
 @pytest.mark.parametrize('error', ['duplicate','missing','ohlc','date','market','turnover','field'])
 def test_invalid_source_refused(error):
-    rows = raw_day()
+    rows = raw_day(DAY)
     pair = next(x for x in rows if x[1].get('ISU_CD') == '000660')
     if error == 'duplicate':
         rows.append(pair)
@@ -78,14 +60,14 @@ def test_invalid_source_refused(error):
 
 
 def test_provider_error_and_other_index_selection():
-    row = raw_day()[0][1]
+    row = raw_day(DAY)[0][1]
     assert select_rows('kospi_dd_trd', DAY, {'OutBlock_1':[{**row, 'IDX_NM':'코스피 200'}]}) == []
     with pytest.raises(SourceError):
         select_rows('kospi_dd_trd', DAY, {'respCode':'401', 'OutBlock_1':[row]})
 
 
 def test_archive_requires_complete_readback_preserves_raw_and_hashes():
-    bars = validate_day(DAY, raw_day())
+    bars = validate_day(DAY, raw_day(DAY))
     entries = [(DAY.isoformat(), s, bar['service'], canonical(raw)) for s,(bar,raw) in sorted(bars.items())]
     check = signature(entries)
     data = archive(iter(entries), [DAY], check, 2)
@@ -122,3 +104,52 @@ def test_bulk_http_requires_owner_and_post_bearer(monkeypatch):
     with pytest.raises(HTTPException) as e:
         next(r.endpoint for r in routes if 'POST' in r.methods)(req)
     assert e.value.status_code == 401
+
+
+class PeriodSession:
+    def __init__(self, pages, status=200):
+        self.pages = iter(pages)
+        self.status_code = status
+        self.calls = []
+    def get(self, url, **kwargs):
+        self.calls.append(kwargs['params'])
+        return self
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
+    def iter_content(self, size):
+        yield json.dumps(next(self.pages)).encode()
+
+
+def test_whole_period_request_includes_end_and_preserves_original_fields():
+    from research_krx_period import fetch_period, STOCK
+    from research_krx_bulk import normalize
+    row = {'basDt':'20261125','srtnCd':'005930','itmsNm':'삼성전자','mrktCtg':'KOSPI',
+           'mkp':'100','hipr':'103','lopr':'97','clpr':'102','trqu':'123','trPrc':'12345'}
+    body = {'response':{'header':{'resultCode':'00'},'body':{'pageNo':1,'totalCount':2,
+            'items':{'item':[row,{**row,'basDt':'20261126'}]}}}}
+    session = PeriodSession([body])
+    found = fetch_period('fixture', '005930.KS', (DAY,), session)
+    assert found == {'2026-11-25':row} and session.calls[0]['endBasDt'] == '20261126'
+    assert normalize(STOCK,row,DAY)['turnover'] == 12345
+
+
+def test_range_identity_and_duplicate_checks():
+    from research_krx_period import fetch_period
+    row = {'idxNm':'코스피','basDt':'20261125'}
+    for bad in ([row,row],[{**row,'idxNm':'코스피 200'}],[{**row,'basDt':'20261120'}]):
+        payload = {'response':{'header':{'resultCode':'00'},'body':{'pageNo':1,'totalCount':len(bad),'items':{'item':bad}}}}
+        with pytest.raises(SourceError):
+            fetch_period('fixture','^KS11',(DAY,),PeriodSession([payload]))
+
+
+def test_range_rejects_service_permissions_and_changing_totals():
+    from research_krx_period import fetch_period
+    with pytest.raises(SourceError,match='FSC_AUTH_DENIED'):
+        fetch_period('fixture','^KQ11',(DAY,),PeriodSession([],403))
+    row = {'idxNm':'코스닥','basDt':'20261125'}
+    def page(n, total):
+        return {'response':{'header':{'resultCode':'00'},'body':{'pageNo':n,'totalCount':total,'items':{'item':[row]}}}}
+    with pytest.raises(SourceError,match='FSC_INVALID_PAGINATION'):
+        fetch_period('fixture','^KQ11',(DAY,),PeriodSession([page(1,2),page(2,4)]))

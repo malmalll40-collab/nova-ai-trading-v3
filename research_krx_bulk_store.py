@@ -1,9 +1,7 @@
 """Resumable KRX staging and atomic, immutable full-cohort publication in PostgreSQL."""
 import hashlib
 import json
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import date
 from decimal import Decimal
@@ -12,16 +10,21 @@ import psycopg
 import requests
 
 from research_history_checkpoint import canonical, digest
-from research_krx_bulk import FIELDS, SYMBOLS, SourceError, archive, select_rows, validate_day, normalize
+from research_krx_bulk import CODES, FIELDS, SYMBOLS, SourceError, archive, select_rows, validate_day, normalize
 from research_krx_collection import ORDER, read_one
-from research_krx_snapshot import TABLE as LEGACY
+from research_krx_snapshot import TABLE as LEGACY, SERVICES
+from research_krx_period import INDEX, INDEX_SYMBOLS, STOCK, fetch_period
 
 LOCK = 601576054
 DAYS_PER_RESPONSE = 5
 STAGE = 'nova_krx_bulk_stage_v1'
 BARS = 'nova_krx_bulk_bars_v1'
 RELEASES = 'nova_krx_bulk_releases_v1'
+PERIOD = 'nova_krx_period_source_v1'
 SCHEMA = (
+    f'''CREATE TABLE IF NOT EXISTS {PERIOD} (dataset text NOT NULL, symbol text NOT NULL,
+        source text NOT NULL, state text NOT NULL, body jsonb NOT NULL, total integer NOT NULL,
+        PRIMARY KEY(dataset,symbol))''',
     f'CREATE TABLE IF NOT EXISTS {STAGE} (dataset text NOT NULL, day date NOT NULL, body text NOT NULL, checksum text NOT NULL, PRIMARY KEY(dataset,day))',
     f'''CREATE TABLE IF NOT EXISTS {BARS} (
         dataset text NOT NULL, day date NOT NULL, symbol text NOT NULL, service text NOT NULL,
@@ -34,40 +37,22 @@ SCHEMA = (
 
 
 class KRXReader:
-    """At most two in-flight official, idempotent requests. No implicit retries."""
+    """Sequential official reads for uncovered data only. No implicit retries."""
     def __init__(self, key):
         self.key = key
-        self.pool = ThreadPoolExecutor(max_workers=2)
-        self.local = threading.local()
-        self.sessions = []
-        self.lock = threading.Lock()
+        self.session = requests.Session()
         self.next_start = 0.0
 
     def read(self, service, day):
-        with self.lock:
-            if not hasattr(self.local, 'session'):
-                self.local.session = requests.Session()
-                self.sessions.append(self.local.session)
-            time.sleep(max(0, self.next_start - time.monotonic()))
-            self.next_start = time.monotonic() + 0.25
-        status, payload = read_one(self.local.session, self.key, service, day)
+        time.sleep(max(0, self.next_start - time.monotonic()))
+        self.next_start = time.monotonic() + 0.25
+        status, payload = read_one(self.session, self.key, service, day)
         if status != 'success':
             raise SourceError('KRX_' + status.upper(), day, service)
         return select_rows(service, day, payload)
 
-    def day(self, day):
-        result = []
-        # Do not start the next pair if auth, quota or schema checks fail.
-        for pair in (ORDER[:2], ORDER[2:]):
-            futures = [self.pool.submit(self.read, s, day) for s in pair]
-            for future in futures:
-                result.extend(future.result())
-        return result
-
     def close(self):
-        self.pool.shutdown(wait=True, cancel_futures=True)
-        for session in self.sessions:
-            session.close()
+        self.session.close()
 
 
 def initialize(cur):
@@ -136,7 +121,7 @@ def compare_legacy(cur, dataset, bars):
             raise SourceError('KRX_LEGACY_CHECKSUM_CONFLICT', day, service)
         for symbol, old in json.loads(raw).items():
             new = bars.get((stamp, symbol))
-            if new is None or new['service'] != service or any(new.get(k) != v for k,v in old.items()):
+            if new is None or (new['service'] != service and new['service'] not in (INDEX,STOCK,'KRX_existing_stock')) or any(new.get(k) != v for k,v in old.items()):
                 raise SourceError('KRX_LEGACY_VALUE_CONFLICT', day, service, symbol)
             overlap += 1
     return overlap
@@ -203,9 +188,92 @@ def step(db, dataset, days, reader, limit=DAYS_PER_RESPONSE):
         return info
 
 
-def run_step(dsn, key, dataset, days):
-    with psycopg.connect(dsn, connect_timeout=8, autocommit=True) as db, closing(KRXReader(key)) as reader:
-        return step(db, dataset, days, reader.day)
+def period_step(db, dataset, days, key):
+    """Download an entire symbol history per published query. Count only actual provider rows."""
+    with db.transaction(), db.cursor() as cur:
+        if not lock(cur):
+            return {'status':'BUSY'}
+        initialize(cur)
+        cur.execute(f'SELECT symbol,source,state FROM {PERIOD} WHERE dataset=%s', (dataset,))
+        saved = cur.fetchall()
+        seen = {r[0] for r in saved}
+        denied = {r[1] for r in saved if r[2] == 'AUTH_DENIED'}
+        if not key:
+            return None
+        for symbol in sorted(SYMBOLS):
+            source = INDEX if symbol in INDEX_SYMBOLS.values() else STOCK
+            if symbol in seen or source in denied:
+                continue
+            try:
+                with requests.Session() as session:
+                    rows = fetch_period(key, symbol, days, session)
+                for stamp, row in rows.items():
+                    if normalize(source, row, date.fromisoformat(stamp))['symbol'] != symbol:
+                        raise SourceError('FSC_IDENTITY_MISMATCH', service=source, symbol=symbol)
+                state = 'RECEIVED' if rows else 'NO_DATA'
+            except SourceError as exc:
+                if str(exc) != 'FSC_AUTH_DENIED':
+                    raise
+                rows, state = {}, 'AUTH_DENIED'
+            cur.execute(f'INSERT INTO {PERIOD} VALUES (%s,%s,%s,%s,%s::jsonb,%s)',
+                        (dataset, symbol, source, state, canonical(rows), len(rows)))
+            return {'status':'PERIOD', 'symbol':symbol, 'source':source, 'source_state':state,
+                    'received_rows':len(rows), 'processed_series':len(seen)+1}
+    return None
+
+
+def complete_day(db, dataset, day, reader):
+    """Read staged period data first. Use earlier verified stocks and query only remaining services."""
+    stamp = day.isoformat()
+    with db.cursor() as cur:
+        cur.execute(f'SELECT symbol,source,body->%s FROM {PERIOD} WHERE dataset=%s AND body ? %s',
+                    (stamp,dataset,stamp))
+        selected = {symbol:[source, body] for symbol,source,body in cur}
+        missing = SYMBOLS - selected.keys()
+        if not missing:
+            return list(selected.values())
+        stocks = missing & set(CODES.values())
+        if stocks:
+            cur.execute('SELECT to_regclass(%s)', (LEGACY,))
+            if cur.fetchone()[0]:
+                cur.execute(f'SELECT service,payload,digest FROM {LEGACY} WHERE dataset=%s AND day=%s',
+                            (dataset,stamp))
+                for service, body, checksum in cur.fetchall():
+                    if service not in ('stk_bydd_trd','ksq_bydd_trd'):
+                        continue
+                    if digest(body) != checksum:
+                        raise SourceError('KRX_LEGACY_CHECKSUM_CONFLICT', day, service)
+                    for symbol, values in json.loads(body).items():
+                        if symbol in stocks:
+                            raw = {'day':stamp,'symbol':symbol,'market_service':service,'values':values}
+                            selected[symbol] = ['KRX_existing_stock',raw]
+    missing = SYMBOLS - selected.keys()
+    services = [s for s in ORDER[:2] if SERVICES[s][0] in missing]
+    if missing & set(CODES.values()):
+        services.extend(ORDER[2:])
+    for service in services:
+        if not reader.key:
+            raise SourceError('KRX_KEY_REQUIRED_FOR_GAP', day, service)
+        for source, raw in reader.read(service, day):
+            bar = normalize(source, raw, day)
+            if bar['symbol'] in missing:
+                if bar['symbol'] in selected:
+                    raise SourceError('KRX_DUPLICATE_SYMBOL', day, source, bar['symbol'])
+                selected[bar['symbol']] = [source,raw]
+    return list(selected.values())
+
+
+def run_step(dsn, key, dataset, days, period_key=''):
+    with psycopg.connect(dsn, connect_timeout=8, autocommit=True) as db:
+        with db.cursor() as cur:
+            info = status(cur, dataset, days)
+        if info['status'] == 'PUBLISHED':
+            return info
+        response = period_step(db, dataset, days, period_key)
+        if response is not None:
+            return response
+        with closing(KRXReader(key)) as reader:
+            return step(db, dataset, days, lambda day: complete_day(db, dataset, day, reader))
 
 
 def download(cur, dataset, days):

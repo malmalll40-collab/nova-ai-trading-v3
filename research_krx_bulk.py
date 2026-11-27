@@ -65,6 +65,37 @@ def select_rows(service, day, payload):
 
 
 def normalize(service, row, day):
+    if service == 'KRX_existing_stock':
+        native = row.get('market_service')
+        symbol = row.get('symbol')
+        values = row.get('values')
+        if (native not in MARKETS or symbol not in SERVICES[native] or not isinstance(values,dict)
+                or set(values) != set(FIELDS) or row.get('day') != day.isoformat()):
+            raise SourceError('KRX_LEGACY_VALUE_CONFLICT', day)
+        mapped = {'ISU_CD': symbol[:6], 'MKT_NM': MARKETS[native], 'BAS_DD': day.strftime('%Y%m%d')}
+        mapped.update({v: values[k] for k,v in STOCK_FIELDS.items()})
+        return {**normalize(native, mapped, day), 'service': service}
+    if service.startswith('FSC_'):
+        from research_krx_period import INDEX, STOCK, INDEX_SYMBOLS, MARKET_FIELDS
+        if service not in (INDEX, STOCK) or not isinstance(row, dict):
+            raise SourceError('FSC_INVALID_ROW', day)
+        if any(k not in row for k in MARKET_FIELDS.values()):
+            raise SourceError('FSC_MISSING_FIELD', day, service)
+        if service == INDEX:
+            code = INDEX_SYMBOLS.get(row.get('idxNm'))
+            native = {'^KS11': 'kospi_dd_trd', '^KQ11': 'kosdaq_dd_trd'}.get(code)
+            mapped = {'IDX_NM': row.get('idxNm')}
+            fields = INDEX_FIELDS
+        else:
+            native = {'KOSPI':'stk_bydd_trd','KOSDAQ':'ksq_bydd_trd'}.get(row.get('mrktCtg'))
+            mapped = {'ISU_CD':row.get('srtnCd'), 'ISU_NM':row.get('itmsNm'), 'MKT_NM':row.get('mrktCtg')}
+            fields = STOCK_FIELDS
+        if not native:
+            raise SourceError('FSC_MARKET_OR_INDEX_MISMATCH', day, service)
+        mapped['BAS_DD'] = row.get('basDt')
+        mapped.update({fields[k]: row[field] for k,field in MARKET_FIELDS.items()})
+        bar = normalize(native, mapped, day)
+        return {**bar, 'service': service}
     if service not in SERVICES or not isinstance(row, dict) or row.get('BAS_DD') != day.strftime('%Y%m%d'):
         raise SourceError('KRX_DATE_OR_SERVICE_MISMATCH', day)
     stock = service in MARKETS
@@ -128,6 +159,7 @@ def archive(entries, days, checksum, overlap):
     by_symbol = {symbol: [] for symbol in sorted(SYMBOLS)}
     original = io.StringIO()
     statuses = Counter()
+    sources = Counter()
     signature = hashlib.sha256()
     for stamp, code, service, body in entries:
         day = date.fromisoformat(stamp)
@@ -140,6 +172,7 @@ def archive(entries, days, checksum, overlap):
                                   separators=(',', ':')) + '\n')
         by_symbol[code].append(row)
         statuses[row['quote_status']] += 1
+        sources[service] += 1
     expected_dates = [d.isoformat() for d in days]
     if signature.hexdigest() != checksum or any([row['day'] for row in rows] != expected_dates for rows in by_symbol.values()):
         raise ValueError('KRX_RELEASE_CHECKSUM_OR_COVERAGE_CONFLICT')
@@ -159,13 +192,17 @@ def archive(entries, days, checksum, overlap):
                 '\ufeff' + buf.getvalue())
         add('krx_source_rows.jsonl', original.getvalue())
         add('validation.json', json.dumps({
-            'provider': 'KRX OPEN API', 'services': sorted(SERVICES), 'basis': BASIS,
+            'origin': 'Korea Exchange (KRX)', 'rows_per_source_service': sources, 'basis': BASIS,
+            'source_definitions': {'FSC_getStockPriceInfo_V2': 'Financial Services Commission via data.go.kr; KRX-supplied stocks',
+                                   'FSC_getStockMarketIndex_V2': 'Financial Services Commission via data.go.kr; KRX-supplied indices',
+                                   'KRX_existing_stock': 'Previously verified KRX Open API stock fields from NOVA (not a full vendor response)',
+                                   'KRX native': 'Other service codes denote direct KRX Open API responses'},
             'requested_start': START.isoformat(), 'requested_end': END.isoformat(),
             'first_session': expected_dates[0], 'last_session': expected_dates[-1],
             'sessions': len(days), 'rows': sum(statuses.values()), 'rows_per_symbol': len(days),
             'stock_count': len(CODES), 'index_count': len(INDEX_NAMES), 'quote_status': statuses,
             'legacy_rows_compared': overlap, 'database_sha256': checksum,
             'missing_symbol_dates': 0, 'duplicates': 0, 'files_sha256': dict(hashes),
-            'source_rows': 'Selected provider rows with original field names and values. Source: Korea Exchange.',
+            'source_rows': 'Original selected provider rows, or the previously stored fields when the service is KRX_existing_stock. Source: Korea Exchange.',
         }, ensure_ascii=False, indent=2) + '\n')
     return output.getvalue()

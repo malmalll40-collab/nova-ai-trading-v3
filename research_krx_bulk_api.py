@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, Response
 from research_history_status import END
 from research_krx_bulk import SourceError, scope
 from research_krx_bulk_store import download, run_step, status
+from research_krx_snapshot import DATASETS as LEGACY_DATASETS, coverage as legacy_coverage
 
 MODE = 'bulk-download-v1'
 HEADERS = {'Cache-Control': 'private, no-store'}
@@ -48,16 +49,27 @@ def router(authenticated):
     def get_status(request: Request):
         dsn = authorize(request)
         with psycopg.connect(dsn, connect_timeout=8) as db, db.cursor() as cur:
-            return JSONResponse(status(cur, *scope()), headers=HEADERS)
+            dataset, days = scope()
+            info = status(cur, dataset, days)
+            cur.execute('SELECT to_regclass(%s)', (LEGACY_DATASETS,))
+            existing = 0
+            if cur.fetchone()[0] is not None:
+                cur.execute(f'SELECT 1 FROM {LEGACY_DATASETS} WHERE id=%s', (dataset,))
+                if cur.fetchone() is not None:
+                    existing = legacy_coverage(cur, 'postgresql', dataset)['stored_rows']
+            return JSONResponse({**info, 'legacy_verified_rows': existing,
+                'legacy_worker_disabled': os.getenv('NOVA_KRX_PRIVATE_COLLECTION') == MODE,
+                'fsc_key_configured': bool(os.getenv('FSC_STOCK_API_KEY', '').strip())}, headers=HEADERS)
 
     @api.post('')
     def advance(request: Request):
         dsn = authorize(request, write=True)
         key = os.getenv('KRX_API_KEY', '').strip()
-        if not key or END >= datetime.now(ZoneInfo('Asia/Seoul')).date():
+        period_key = os.getenv('FSC_STOCK_API_KEY', '').strip()
+        if not (key or period_key) or END >= datetime.now(ZoneInfo('Asia/Seoul')).date():
             raise HTTPException(409, 'KRX_KEY_OR_PERIOD_UNAVAILABLE', headers=HEADERS)
         try:
-            result = run_step(dsn, key, *scope())
+            result = run_step(dsn, key, *scope(), period_key=period_key)
         except SourceError as exc:
             raise HTTPException(409, exc.details, headers=HEADERS) from None
         return JSONResponse(result, headers=HEADERS)

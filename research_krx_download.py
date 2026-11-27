@@ -35,7 +35,7 @@ def main():
                 break
             if info['status'] == 'BUSY':
                 time.sleep(2)
-            elif info['status'] != 'STAGING':
+            elif info['status'] not in ('STAGING','PERIOD'):
                 raise SystemExit('Unexpected import state')
         result = session.get(base + '/download', timeout=(12, 180), allow_redirects=False)
         if result.status_code != 200:
