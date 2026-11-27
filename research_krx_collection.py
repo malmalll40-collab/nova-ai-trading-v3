@@ -160,12 +160,24 @@ def collect(store,session,key,mode,ready,wait,emit):
     emit('krx_collection_coverage',{**BASE,**info})
     return stop('BOUNDED_PASS_COMPLETE')
 
+def collection_eligible(s, mode):
+    """Allow the explicitly enabled four-call historical pilot outside the
+    KIS research window, but never with unknown calendar or foreground load.
+    Bulk history continues to use the existing quiet-window gate.
+    """
+    if mode == BATCH_MODE:
+        return eligible(s)
+    if mode != PILOT_MODE or s.get('krx_regular_status') not in ('OPEN','CLOSED'):
+        return False
+    return (s.get('kis_load',{}).get('physical_attempts_60s') == 0
+            and eligible({**s,'quiet_window':True}))
+
 def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,session_factory=requests.Session,emit=None):
     if emit is None:
         from ops_diagnostics import emit
     wait=wait or stop.wait
     def ready():
-        try:return not stop.is_set() and eligible(snapshot())
+        try:return not stop.is_set() and collection_eligible(snapshot(),mode)
         except Exception:return False
     if wait(120):return
     if not ready() or not dsn or not key:
