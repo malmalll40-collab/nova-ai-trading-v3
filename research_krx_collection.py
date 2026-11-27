@@ -172,6 +172,51 @@ def collection_eligible(s, mode):
     return (s.get('kis_load',{}).get('physical_attempts_60s') == 0
             and eligible({**s,'quiet_window':True}))
 
+PILOT_IDLE_CHECKS=11
+PILOT_IDLE_POLL_SECONDS=30
+
+def admission_reasons(s, mode):
+    # Fixed codes only; do not log the raw snapshot or provider data.
+    from ops_preflight import JOBS,TERMINAL
+    if not isinstance(s,dict):return ['SNAPSHOT_UNAVAILABLE']
+    reasons=[]
+    if s.get('calendar_verified') is not True:reasons.append('CALENDAR_UNVERIFIED')
+    if mode==PILOT_MODE and s.get('krx_regular_status') not in ('OPEN','CLOSED'):
+        reasons.append('MARKET_STATUS_UNKNOWN')
+    if mode==BATCH_MODE and s.get('quiet_window') is not True:reasons.append('QUIET_WINDOW')
+    jobs=s.get('jobs') or {}
+    if set(jobs)!=set(JOBS) or any(v not in TERMINAL for v in jobs.values()):
+        reasons.append('JOB_BUSY_OR_UNKNOWN')
+    if s.get('window_overflow') is not False:reasons.append('TELEMETRY_OVERFLOW_OR_UNKNOWN')
+    load=s.get('kis_load') or {}
+    counters=['foreground_active','physical_active','research_active','recent_provider_errors']
+    if mode==PILOT_MODE:counters.append('physical_attempts_60s')
+    for key in counters:
+        if type(load.get(key)) is not int or load[key]!=0:
+            reasons.append(key.upper())
+    if mode not in (PILOT_MODE,BATCH_MODE):reasons.append('INVALID_MODE')
+    return reasons
+
+def await_admission(stop,snapshot,mode,wait,emit):
+    """Poll local readiness only before any DB claim or provider request.
+    No automatic retry of dispatched, failed, or uncertain KRX calls.
+    """
+    checks=PILOT_IDLE_CHECKS if mode==PILOT_MODE else 1
+    for attempt in range(1,checks+1):
+        if stop.is_set():return False
+        try:
+            s=snapshot()
+            reasons=admission_reasons(s,mode)
+            clear=not reasons and collection_eligible(s,mode)
+            if not clear and not reasons:reasons=['ADMISSION_UNVERIFIED']
+        except Exception:
+            clear=False;reasons=['SNAPSHOT_UNAVAILABLE']
+        emit('krx_collection_admission',{**BASE,'mode':mode,'check':attempt,
+            'max_checks':checks,'status':'READY' if clear else 'BLOCKED','reasons':reasons})
+        if clear:return True
+        if attempt<checks and wait(PILOT_IDLE_POLL_SECONDS):return False
+    return False
+
 def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,session_factory=requests.Session,emit=None):
     if emit is None:
         from ops_diagnostics import emit
@@ -180,7 +225,9 @@ def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,s
         try:return not stop.is_set() and collection_eligible(snapshot(),mode)
         except Exception:return False
     if wait(120):return
-    if not ready() or not dsn or not key:
+    if not dsn or not key:
+        return emit('krx_collection_stop',{**BASE,'reason':'CONFIGURATION_MISSING'})
+    if not await_admission(stop,snapshot,mode,wait,emit):
         return emit('krx_collection_stop',{**BASE,'reason':'ADMISSION_BLOCKED'})
     try:
         days,_=corrected_sessions(session_dates(START,END),START,END)
