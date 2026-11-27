@@ -22,6 +22,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from nova_release import APP_VERSION
+from research_krx_bulk_api import router as krx_bulk_router
 from fastapi.staticfiles import StaticFiles
 from engine import Config, feature_frame, decide
 from structural_risk import evidence_from_features, reprice_from_evidence
@@ -192,6 +193,8 @@ def _authorize(request: Request):
     if not _is_authenticated(request):
         raise HTTPException(401, '인증이 만료됐습니다. 설정에서 서버 접근 토큰을 입력하세요.')
 
+
+app.include_router(krx_bulk_router(_is_authenticated))
 
 def _secure_cookie(request: Request) -> bool:
     # Render sets NOVA_PUBLIC_DEPLOY=1. Local HTTP development continues to work.
