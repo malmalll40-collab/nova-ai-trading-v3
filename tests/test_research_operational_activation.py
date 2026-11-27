@@ -17,7 +17,7 @@ class Ledger:
 
 def state():
     from ops_preflight import JOBS
-    return {'quiet_window':True,'calendar_verified':True,'jobs':dict.fromkeys(JOBS,'idle'),
+    return {'quiet_window':True,'calendar_verified':True,'krx_regular_status':'CLOSED','jobs':dict.fromkeys(JOBS,'idle'),
             'window_overflow':False,'kis_load':dict.fromkeys(('foreground_active','physical_active','research_active','recent_provider_errors'),0)}
 
 def test_operational_permit_is_gate_bound_and_not_provider_evidence():
@@ -134,3 +134,12 @@ def test_worker_rechecks_recovered_reservation_before_token():
            runner=lambda *a,**kw:{'status':'BLOCKED','coverage':{'stored_rows':150},'collection':{'new_rows':0}},
            emit=lambda e,v:calls.append((e,v)))
     assert [e for e,v in calls]==['research_quota_probe','research_undispatched_recovery','research_quota_probe','research_collection_pass']
+
+
+def test_daytime_operational_history_gate_is_fail_closed():
+    from research_operational_activation import historical_eligible
+    s={**state(),'quiet_window':False,'krx_regular_status':'OPEN'}
+    assert historical_eligible(s) and not eligible(s)
+    assert not historical_eligible({**s,'krx_regular_status':'UNKNOWN'})
+    assert not historical_eligible({**s,'calendar_verified':False})
+    assert not historical_eligible({**s,'kis_load':{**s['kis_load'],'foreground_active':1}})

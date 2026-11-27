@@ -5,8 +5,8 @@ A trusted installed coordinator must supply a fresh reservation for each GET.
 """
 import time
 from nova_v579_admission import ResearchHistoryClient,ResearchBlocked
-from nova_v576_expanded_coverage import corrected_sessions,quiet_window,MAX_CALLS,MAX_SECONDS
-from nova_v574_data_audit import session_dates
+from nova_v576_expanded_coverage import corrected_sessions,historical_window,MAX_CALLS,MAX_SECONDS
+from nova_v574_data_audit import session_dates,KST
 from research_history_status import START,END
 from research_history_run_control import run_exclusive
 
@@ -56,7 +56,8 @@ def execute(dsn,*,kis,telemetry,coordinator,session_mode_confirmed,now,calendar,
     def guard():
         try:
             t=now()
-            return (clock()<deadline and quiet_window(t,calendar(t))
+            return (clock()<deadline and historical_window(t,calendar(t))
+                    and END<t.astimezone(KST).date()
                     and coordinator.available() is True)
         except Exception:
             return False

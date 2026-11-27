@@ -13,7 +13,7 @@ import threading
 import requests
 from market_scanner import URLS,classify_krx_response
 from research_krx_snapshot import parse_snapshot,SERVICES
-from research_operational_activation import eligible
+from research_operational_activation import historical_eligible
 
 DAY=date(2026,11,25)
 MARKETS=('kospi','kosdaq')
@@ -95,7 +95,7 @@ def worker(stop,snapshot,dsn,key,*,wait=None,attempts=None,session_factory=reque
     if emit is None:
         from ops_diagnostics import emit
     def ready():
-        try:return not stop.is_set() and eligible(snapshot())
+        try:return not stop.is_set() and historical_eligible(snapshot())
         except Exception:return False
     def blocked(reason):
         emit('krx_access_probe_stop',{'reason':reason,'orders_enabled':False,'stored_rows':0})

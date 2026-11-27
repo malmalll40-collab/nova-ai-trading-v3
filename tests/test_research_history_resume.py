@@ -171,3 +171,16 @@ def test_unverified_dispatch_keeps_existing_checkpoint_without_network_retry(db)
     assert r['new_rows']==0 and len(api.calls)==1
     with db() as (cur,kind):
         assert saved(cur,kind,dataset,SYMBOLS[0])=={D[-1]:{'close':100.0}}
+
+
+def test_daytime_history_resume_and_unfinished_date_rejection(db):
+    api=API()
+    midday=datetime(2026,11,26,12,tzinfo=KST)
+    schedule={**SCHEDULE,'status':'OPEN'}
+    r=resume(api,D,transaction=db,now=lambda:midday,calendar=lambda t:schedule,
+             admission=lambda:True,pause=lambda n:None,max_windows=1)
+    assert r['new_rows']==3 and len(api.calls)==1
+    api.calls.clear()
+    r=resume(api,D,transaction=db,now=lambda:datetime(2026,11,25,12,tzinfo=KST),
+             calendar=lambda t:schedule,admission=lambda:True,pause=lambda n:None)
+    assert r['status']=='BLOCKED' and not api.calls

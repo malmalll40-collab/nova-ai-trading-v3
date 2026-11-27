@@ -7,7 +7,7 @@ No automatic scheduling, order path, or strategy adoption.
 from datetime import datetime
 import time
 from nova_v574_data_audit import KST, collect, ProbeError, MAX_PAGES, MAX_INDEX_PAGES, INDEX_CODES, SAFE_ADMISSION_STOPS
-from nova_v576_expanded_coverage import GROUPS, GroupBudget, GuardedBudget, MAX_CALLS, MAX_SECONDS, GROUP_PAUSE_SECONDS, quiet_window
+from nova_v576_expanded_coverage import GROUPS, GroupBudget, GuardedBudget, MAX_CALLS, MAX_SECONDS, GROUP_PAUSE_SECONDS, historical_window
 from research_history_checkpoint import initialize, missing_windows, append, manifest, saved
 from nova_v579_admission import PROVIDER_STOPS
 
@@ -31,7 +31,7 @@ def resume(api, sessions, *, transaction, now, calendar, admission, pause=time.s
     dataset,_=manifest(sessions)
     def guard():
         t=now()
-        return (quiet_window(t,calendar(t)) and sessions[-1]<t.astimezone(KST).date()
+        return (historical_window(t,calendar(t)) and sessions[-1]<t.astimezone(KST).date()
                 and admission() is True)
     b=GuardedBudget(guard,max_calls=max_calls,max_seconds=max_seconds)
     rows=0; windows=0; completed=0; anchors_checked=0; diagnostic=None

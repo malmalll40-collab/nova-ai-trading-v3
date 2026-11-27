@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from types import SimpleNamespace
 from nova_v574_data_audit import KST
-from ops_preflight import TERMINAL
+from ops_preflight import TERMINAL,JOBS
 from nova_v578_kis_telemetry import KIS_LOAD
 from nova_v579_admission import PROVIDER_STOPS
 from research_kis_shared_quota import SharedQuotaLedger
@@ -28,6 +28,17 @@ def eligible(s):
         and s.get('window_overflow') is False
         and all(s.get('kis_load',{}).get(k)==0 for k in
                 ('foreground_active','physical_active','research_active','recent_provider_errors')))
+
+def historical_eligible(s):
+    """Known calendar, exact local job set and zero active requests/errors."""
+    if s.get('krx_regular_status') not in ('OPEN','CLOSED'):return False
+    if set(s.get('jobs',{}))!=set(JOBS):return False
+    load=s.get('kis_load',{})
+    if any(type(load.get(k)) is not int for k in
+           ('foreground_active','physical_active','research_active','recent_provider_errors')):
+        return False
+    return eligible({**s,'quiet_window':True})
+
 
 def summarize(r):
     c=r.get('coverage',{});a=r.get('collection',{});e=r.get('evaluation',{})
@@ -59,7 +70,7 @@ def worker(stop,snapshot,calendar,gate,dsn,*,wait=None,client_factory=None,runne
     if session_probe is None:
         from research_db_session_probe import probe as session_probe
     def available():
-        try:return not stop.is_set() and eligible(snapshot())
+        try:return not stop.is_set() and historical_eligible(snapshot())
         except Exception:return False
     if wait(DRAIN_SECONDS):
         return

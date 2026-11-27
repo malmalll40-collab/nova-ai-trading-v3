@@ -7,7 +7,7 @@ from research_krx_snapshot import SERVICES
 from ops_preflight import JOBS
 
 def state():
-    return {'quiet_window':True,'calendar_verified':True,'jobs':dict.fromkeys(JOBS,'idle'),
+    return {'quiet_window':True,'calendar_verified':True,'krx_regular_status':'CLOSED','jobs':dict.fromkeys(JOBS,'idle'),
         'window_overflow':False,'kis_load':dict.fromkeys(('foreground_active','physical_active','research_active','recent_provider_errors'),0)}
 def payload():
     return {'OutBlock_1':[{'BAS_DD':'20261125','ISU_CD':s[:6],'MKT_NM':'KOSPI',

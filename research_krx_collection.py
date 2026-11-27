@@ -5,7 +5,7 @@ provider access plus strict cohort schema is required before storage.
 Uncertain dispatched claims remain held; no automatic repeat on errors.
 """
 from contextlib import contextmanager
-from datetime import date
+from datetime import date,datetime
 import json
 import os
 import threading
@@ -16,9 +16,9 @@ from research_history_checkpoint import execute
 from research_krx_snapshot import SERVICES,TABLE,initialize,import_snapshot,coverage,manifest
 from research_krx_access_probe import MAX_BYTES,PARSE_CODES
 from research_history_status import START,END
-from nova_v574_data_audit import session_dates
+from nova_v574_data_audit import session_dates,KST
 from nova_v576_expanded_coverage import corrected_sessions
-from research_operational_activation import eligible
+from research_operational_activation import historical_eligible
 
 PILOT=date(2026,11,20)
 ORDER=('kospi_dd_trd','kosdaq_dd_trd','stk_bydd_trd','ksq_bydd_trd')
@@ -161,16 +161,12 @@ def collect(store,session,key,mode,ready,wait,emit):
     return stop('BOUNDED_PASS_COMPLETE')
 
 def collection_eligible(s, mode):
-    """Allow the explicitly enabled four-call historical pilot outside the
-    KIS research window, but never with unknown calendar or foreground load.
-    Bulk history continues to use the existing quiet-window gate.
+    """Completed historical dates only; both modes use idle admission.
+    Calls remain sequential and bounded, with a durable claim before I/O.
     """
-    if mode == BATCH_MODE:
-        return eligible(s)
-    if mode != PILOT_MODE or s.get('krx_regular_status') not in ('OPEN','CLOSED'):
-        return False
-    return (s.get('kis_load',{}).get('physical_attempts_60s') == 0
-            and eligible({**s,'quiet_window':True}))
+    if mode not in (PILOT_MODE,BATCH_MODE):return False
+    recent=s.get('kis_load',{}).get('physical_attempts_60s')
+    return type(recent) is int and recent==0 and historical_eligible(s)
 
 PILOT_IDLE_CHECKS=11
 PILOT_IDLE_POLL_SECONDS=30
@@ -181,16 +177,15 @@ def admission_reasons(s, mode):
     if not isinstance(s,dict):return ['SNAPSHOT_UNAVAILABLE']
     reasons=[]
     if s.get('calendar_verified') is not True:reasons.append('CALENDAR_UNVERIFIED')
-    if mode==PILOT_MODE and s.get('krx_regular_status') not in ('OPEN','CLOSED'):
+    if mode in (PILOT_MODE,BATCH_MODE) and s.get('krx_regular_status') not in ('OPEN','CLOSED'):
         reasons.append('MARKET_STATUS_UNKNOWN')
-    if mode==BATCH_MODE and s.get('quiet_window') is not True:reasons.append('QUIET_WINDOW')
     jobs=s.get('jobs') or {}
     if set(jobs)!=set(JOBS) or any(v not in TERMINAL for v in jobs.values()):
         reasons.append('JOB_BUSY_OR_UNKNOWN')
     if s.get('window_overflow') is not False:reasons.append('TELEMETRY_OVERFLOW_OR_UNKNOWN')
     load=s.get('kis_load') or {}
     counters=['foreground_active','physical_active','research_active','recent_provider_errors']
-    if mode==PILOT_MODE:counters.append('physical_attempts_60s')
+    if mode in (PILOT_MODE,BATCH_MODE):counters.append('physical_attempts_60s')
     for key in counters:
         if type(load.get(key)) is not int or load[key]!=0:
             reasons.append(key.upper())
@@ -201,7 +196,7 @@ def await_admission(stop,snapshot,mode,wait,emit):
     """Poll local readiness only before any DB claim or provider request.
     No automatic retry of dispatched, failed, or uncertain KRX calls.
     """
-    checks=PILOT_IDLE_CHECKS if mode==PILOT_MODE else 1
+    checks=PILOT_IDLE_CHECKS if mode in (PILOT_MODE,BATCH_MODE) else 1
     for attempt in range(1,checks+1):
         if stop.is_set():return False
         try:
@@ -231,6 +226,8 @@ def worker(stop,snapshot,dsn,key,mode,*,wait=None,store_factory=CollectorStore,s
         return emit('krx_collection_stop',{**BASE,'reason':'ADMISSION_BLOCKED'})
     try:
         days,_=corrected_sessions(session_dates(START,END),START,END)
+        if days[-1]>=datetime.now(KST).date():
+            return emit('krx_collection_stop',{**BASE,'reason':'HISTORY_NOT_COMPLETED'})
         store=store_factory(dsn,days)
         with session_factory() as session:
             collect(store,session,key,mode,ready,wait,emit)

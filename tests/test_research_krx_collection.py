@@ -114,7 +114,7 @@ def test_pilot_independent_window_preserves_foreground_and_calendar_guards():
        'kis_load':dict.fromkeys(('foreground_active','physical_active','research_active',
                                  'recent_provider_errors','physical_attempts_60s'),0)}
     assert rc.collection_eligible(s,rc.PILOT_MODE)
-    assert not rc.collection_eligible(s,rc.BATCH_MODE)
+    assert rc.collection_eligible(s,rc.BATCH_MODE)
     assert not rc.collection_eligible(s,'unknown')
     assert rc.collection_eligible({**s,'quiet_window':True},rc.BATCH_MODE)
     for patch in ({'calendar_verified':False},{'krx_regular_status':'UNKNOWN'},
@@ -144,11 +144,11 @@ def test_pilot_admission_polls_local_state_until_idle():
     assert logs[0]['reasons']==['PHYSICAL_ATTEMPTS_60S']
     assert logs[1]['status']=='READY'
 
-def test_admission_bounded_and_batch_not_retried():
+def test_admission_bounded_for_both_modes():
     import threading
     good=_idle_snapshot()
     busy={**good,'jobs':{**good['jobs'],'scan_full':'running'}}
-    for mode,n in ((rc.PILOT_MODE,11),(rc.BATCH_MODE,1)):
+    for mode,n in ((rc.PILOT_MODE,11),(rc.BATCH_MODE,11)):
         waits=[];logs=[]
         assert not rc.await_admission(threading.Event(),lambda:busy,mode,
                lambda t:waits.append(t) or False,lambda k,d:logs.append(d))
