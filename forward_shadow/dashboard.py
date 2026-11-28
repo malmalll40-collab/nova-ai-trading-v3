@@ -5,7 +5,7 @@ import json, os, sqlite3, tempfile, threading, time
 from pathlib import Path
 from contextlib import closing
 from datetime import datetime
-from . import runner as r, forward as f, collector as c
+from . import runner as r, forward as f, collector as c, evidence_audit
 from research_forward_seed import NS, KEY, MAX_DB_BEFORE_SEED
 
 def summary(path,last,rev):
@@ -17,6 +17,7 @@ def summary(path,last,rev):
         total,first=db.execute('SELECT count(*),min(day) FROM bars').fetchone()
         market=dict(db.execute('SELECT market,count(*) FROM bars GROUP BY market'))
         sessions=db.execute('SELECT day,mode,equity,cash,positions,events,candidates,market_counts FROM sessions ORDER BY day').fetchall()
+        audit=evidence_audit.ledger(db.execute('SELECT day,mode,observed_at,candidates,events FROM sessions ORDER BY day'))
     if sum(market.values())!=total or len(sessions)!=65+rev or set(market)!={'KOSPI','KOSDAQ'}:
         raise ValueError('COUNTS_MISMATCH')
     for row in sessions:
@@ -24,13 +25,14 @@ def summary(path,last,rev):
     current=sessions[-1]
     events=[e for row in sessions if row[1]!='SEED' for e in json.loads(row[5])]
     exits=[float(e['net_pct']) for e in events if e['event']=='EXIT_ASSUMED']
-    if len(exits)!=rep['closed_assumed']:raise ValueError('EXIT_COUNT')
+    if len(exits)!=rep['closed_assumed'] or audit['exit_assumed_count']!=len(exits):raise ValueError('EXIT_COUNT')
+    if audit['prospective_ledger_sessions']!=rep['prospective_sessions'] or audit['prospective_candidates']!=rep['candidate_count']:raise ValueError('LEDGER_COUNT')
     wins=sum(v>0 for v in exits)
     positions=[{'code':code,'shares':p['n'],'cost_krw':p['cost'],'mark_krw':p['mark'],
                 'locked':bool(p['locked']),'entry_day':sessions[p['entry_seq']][0]}
                for code,p in sorted(json.loads(current[4]).items())]
     curve=[{'day':row[0],'equity_krw':row[2],'mode':row[1]} for row in sessions if row[1]!='SEED']
-    return {**rep,'total_bars':total,'market_bars':market,'first_day':first,'total_sessions':len(sessions),
+    return {**rep,**audit,'total_bars':total,'market_bars':market,'first_day':first,'total_sessions':len(sessions),
             'last_market_counts':json.loads(current[7]),'cash_krw':current[3],
             'positions':positions,'equity_curve':curve,'win_rate_pct':100*wins/len(exits) if exits else None,
             'winning_exits':wins,'mean_closed_return_pct':sum(exits)/len(exits) if exits else None,

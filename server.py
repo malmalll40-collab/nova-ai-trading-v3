@@ -101,11 +101,22 @@ async def _app_lifespan(application):
                 fields=('status','revision','total_bars','total_sessions','market_bars','last_day',
                         'next_session','prospective_sessions','late_bridge_sessions','closed_assumed',
                         'win_rate_pct','equity_frozen_mark','return_pct','mdd_pct','collection_status',
-                        'unresolved_calls','completed_response_claims','schedule_configured','orders_enabled')
+                        'unresolved_calls','completed_response_claims','schedule_configured','orders_enabled',
+                        'ledger_integrity','prospective_signal_days','prospective_candidates',
+                        'entry_assumed_count','uncertain_event_count','corporate_review_event_count',
+                        'independent_commit_time_verified','model_prediction_verified')
                 emit('forward_dashboard_probe',{k:data[k] for k in fields})
             except Exception:
                 emit('forward_dashboard_probe',{'status':'UNAVAILABLE','orders_enabled':False})
         threading.Thread(target=probe_forward_dashboard,daemon=True,name='nova-forward-dashboard-probe').start()
+        def probe_history_archive():
+            from ops_diagnostics import emit
+            try:
+                from forward_shadow.evidence_audit import archive_summary
+                emit('history_archive_probe',archive_summary(os.getenv('DATABASE_URL','').strip()))
+            except Exception:
+                emit('history_archive_probe',{'status':'UNAVAILABLE','training_ready':False,'orders_enabled':False})
+        threading.Thread(target=probe_history_archive,daemon=True,name='nova-history-archive-probe').start()
     stop_preflight = threading.Event()
     install_forward_snapshot(_ops_preflight_snapshot)
     if os.getenv('NOVA_FORWARD_BRIDGE_ON_START')=='1':
