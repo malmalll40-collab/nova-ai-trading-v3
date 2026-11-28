@@ -1,0 +1,56 @@
+{
+  "raw_rows": 1995617,
+  "raw_codes": 2997,
+  "market_days": 729,
+  "eligible_before_safe": 1375361,
+  "safe_rows": 1314210,
+  "safe_codes": 2847,
+  "unknown": 2907,
+  "phase_counts": {
+    "development": 622401,
+    "reviewed_holdout": 317390,
+    "validation": 374419
+  },
+  "validation": {
+    "auc": 0.710918,
+    "average_precision": 0.115026,
+    "base_rate": 0.056432,
+    "roundtrip_60bps": {
+      "liquidity": {
+        "precision": 0.090395,
+        "mean_net_pct": -0.143528,
+        "loss5": 0.011299
+      },
+      "up": {
+        "precision": 0.121469,
+        "mean_net_pct": -0.987859,
+        "loss5": 0.124294
+      },
+      "mean": {
+        "precision": 0.096045,
+        "mean_net_pct": -0.934822,
+        "loss5": 0.09887
+      },
+      "joint": {
+        "precision": 0.096045,
+        "mean_net_pct": -1.038813,
+        "loss5": 0.10452
+      },
+      "joint_abstain": {
+        "signals": 205,
+        "precision": 0.121951,
+        "mean_net_pct": -0.945533,
+        "loss5": 0.112195
+      }
+    }
+  },
+  "comparison_rows": 20,
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "reviewed_holdout_evaluated": false,
+  "prior_ci": {
+    "run_id": 46135722767,
+    "conclusion": "success"
+  },
+  "limitations": "Historical archive includes all available security codes, not verified common-stock-only or delisting-complete universe. Conservative segment filters and 65-day warmup; unknown outcomes retained. Prior index session used; raw prices not certified adjusted. Repeated historical validation, no independent prospective results. No 5-Core comparison in this replay. Ranking is not portfolio return. Newly committed code CI not yet verified."
+}
