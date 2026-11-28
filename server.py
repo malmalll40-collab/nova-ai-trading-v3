@@ -2366,6 +2366,18 @@ def _ops_startup():
 
 
 
+@app.get('/api/research/forward/performance')
+def forward_performance(request:Request):
+    if not os.getenv('NOVA_ACCESS_TOKEN','').strip():
+        raise HTTPException(503,'서버 접근 인증 설정 필요')
+    _authorize(request);_limit(request)
+    try:
+        from forward_shadow.dashboard import get
+        return JSONResponse(get(os.getenv('DATABASE_URL','').strip()),headers={'Cache-Control':'no-store'})
+    except Exception:
+        raise HTTPException(503,'모의투자 기록 조회 불가 또는 검증 실패') from None
+
+
 @app.post('/api/ops/diagnostics/run')
 def ops_run(request:Request):
     _authorize(request);_limit(request)
