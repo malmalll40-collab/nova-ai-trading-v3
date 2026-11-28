@@ -57,6 +57,19 @@ class Tests(unittest.TestCase):
         s=a.read_status(self.dsn)
         self.assertTrue(s['archive_verified']);self.assertEqual(s['stored_rows'],2)
         self.assertFalse(s['training_ready'])
+    def test_archive_metadata_probe_read_only(self):
+        from forward_shadow.evidence_audit import archive_summary
+        self.assertEqual(archive_summary(self.dsn)['status'],'INCOMPLETE')
+        a.register(self.dsn,self.raw);a.put_coverage(self.dsn,self.cov)
+        for name,blob in self.blobs.items():a.put(self.dsn,name,blob)
+        a.verify_member(self.dsn,'KOSPI_2024.csv')
+        with patch.dict(os.environ,{'NOVA_HISTORY_ARCHIVE_UPLOAD':'0'}):
+            s=archive_summary(self.dsn)
+        self.assertEqual(s['status'],'VERIFIED_METADATA')
+        self.assertEqual((s['stored_rows'],s['stored_chunks'],s['verified_member_count']),(2,2,1))
+        self.assertFalse(s['fresh_full_body_rehash'])
+        self.assertFalse(s['training_ready']);self.assertFalse(s['upload_enabled'])
+        self.assertFalse(s['orders_enabled']);self.assertNotIn('stored_files',s)
     def test_bad_manifest_coverage_and_chunk(self):
         with self.assertRaisesRegex(a.ArchiveError,'MANIFEST_HASH'):a.register(self.dsn,self.raw+b' ')
         a.register(self.dsn,self.raw)

@@ -100,6 +100,25 @@ class Tests(unittest.TestCase):
         self.assertFalse(report['orders_enabled'])
         with psycopg.connect(self.dsn) as db:
             self.assertEqual(db.execute(f'SELECT revision,owner FROM {r.NS}.checkpoint WHERE id=%s',(r.KEY,)).fetchone(),(2,None))
+    def test_prospective_ledger_proof(self):
+        from forward_shadow import dashboard
+        for when in ('2026-11-28T14:00:00+09:00','2026-11-28T14:00:00+09:00','2026-11-30T19:00:00+09:00','2026-12-01T19:00:00+09:00'):
+            self.run_at(when)
+        a=dashboard.read(self.dsn)
+        self.assertEqual(a['ledger_integrity'],'CHECKED')
+        self.assertEqual(a['prospective_signal_days'],2)
+        self.assertEqual(a['prospective_candidates'],4)
+        self.assertEqual(a['entry_assumed_count'],2)
+        self.assertFalse(a['independent_commit_time_verified'])
+        self.assertFalse(a['model_prediction_verified'])
+    def test_ledger_rejects_late_candidate_and_unlinked_entry(self):
+        from forward_shadow.evidence_audit import ledger
+        a=('20261127','LATE_OR_BRIDGE','2026-11-28T14:00:00+09:00','[]','[]')
+        b=('20261130','PROSPECTIVE','2026-11-30T19:00:00+09:00','[{"code":"000001"}]','[]')
+        c=('20261201','PROSPECTIVE','2026-12-01T19:00:00+09:00','[]','[{"code":"000002","event":"ENTRY_ASSUMED"}]')
+        with self.assertRaisesRegex(ValueError,'LEDGER_ENTRY_WITHOUT_PRIOR_SIGNAL'):ledger([a,b,c])
+        with self.assertRaisesRegex(ValueError,'LEDGER_LATE_SIGNAL'):ledger([a[:3]+(b[3],a[4])])
+        with self.assertRaisesRegex(ValueError,'LEDGER_MODE_TIME'):ledger([a,b[:2]+('2026-12-01T19:00:00+09:00',)+b[3:]])
     def test_dashboard_blocks_missing_response(self):
         from forward_shadow import dashboard
         self.run_at('2026-11-28T14:00:00+09:00')

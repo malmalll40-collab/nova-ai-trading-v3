@@ -5,6 +5,8 @@ on:
     paths:
       - forward_shadow/**
       - integration_checks/forward_runner_postgres.py
+      - integration_checks/history_archive_postgres.py
+      - research_krx_archive*.py
       - .github/workflows/forward-runner-integration.yml
       - server.py
 permissions:
