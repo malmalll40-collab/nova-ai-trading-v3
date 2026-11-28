@@ -1,0 +1,67 @@
+{
+  "source_cohort": 966400,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "evaluated_rows": 722670,
+  "days": 346,
+  "folds": 4,
+  "counts_sha256": "c8640f6847a00fa365636f87dc3c4aec0af54bbc95242369f3076d269a3d9af5",
+  "contrasts_sha256": "335dcf587a3c8038b8bf4e9f73fc1736bfeff321174d5a42512ee0f58ecfa2c0",
+  "comparisons": 480,
+  "local_tests": 3,
+  "counts": {
+    "picked_proxy": {
+      "rows": 692,
+      "unknown": 14,
+      "clean_win": 210,
+      "risky_win": 18,
+      "adverse": 194,
+      "other": 256
+    },
+    "missed_inside100": {
+      "rows": 33908,
+      "unknown": 532,
+      "clean_win": 7532,
+      "risky_win": 1004,
+      "adverse": 12867,
+      "other": 11973
+    },
+    "outside100": {
+      "rows": 688070,
+      "unknown": 6368,
+      "clean_win": 95440,
+      "risky_win": 11045,
+      "adverse": 200092,
+      "other": 375125
+    }
+  },
+  "definition": "Clean win: next open to fifth-session close, net >=3% after 120 bps cost, observed low excursion >-5%. Unknown outcomes excluded from contrasts.",
+  "stable_negative_contrast_inside100": {
+    "ret20": [
+      0,
+      5,
+      10,
+      20
+    ],
+    "relative20": [
+      0,
+      5,
+      10,
+      20
+    ],
+    "vol20": [
+      0,
+      5,
+      10,
+      20
+    ],
+    "range_position": [
+      0,
+      5,
+      10,
+      20
+    ]
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Named top-two liquidity proxy only. No historical NOVA signals retrieved. Per-day medians contrasted in already reviewed folds, not independent forecast. Correlated overlapping symbol-days, no causal inference, no tradability proof for lower liquidity, no selection rule or portfolio backtest. Exact lag dates only, missing values not imputed. Local tests passed; latest remote CI unconfirmed."
+}
