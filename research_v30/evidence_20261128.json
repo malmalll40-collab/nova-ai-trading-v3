@@ -1,0 +1,55 @@
+{
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "raw_rows": 1995617,
+  "market_days": 729,
+  "fixed_universe": 100,
+  "eligible_cohort": 47603,
+  "known_5day": 46946,
+  "comparisons": 126,
+  "roundtrip_bps": [
+    60,
+    120
+  ],
+  "reviewed_holdout_60bps": {
+    "h1": {
+      "logistic": {
+        "auc": 0.6105,
+        "precision": 0.1404,
+        "mean_net_pct": -1.1708
+      },
+      "lightgbm": {
+        "auc": 0.6326,
+        "precision": 0.1994,
+        "mean_net_pct": -0.5714
+      },
+      "catboost": {
+        "auc": 0.6251,
+        "precision": 0.177,
+        "mean_net_pct": -0.8917
+      },
+      "xgboost": {
+        "auc": 0.6355,
+        "precision": 0.1854,
+        "mean_net_pct": -0.5974
+      }
+    },
+    "h3": {
+      "best_auc_xgboost": 0.5876,
+      "best_ml_mean_net_pct": -1.0518
+    },
+    "h5": {
+      "best_auc_catboost": 0.5482,
+      "best_ml_mean_net_pct": -1.5787,
+      "liquidity_mean_net_pct": -0.4565,
+      "core5_mean_net_pct": -2.6146
+    }
+  },
+  "ci": {
+    "run_id": 46133422163,
+    "conclusion": "success",
+    "tested_commit": "98ffcb62ac005b6c07f78f821e2afc2d6a9e8346"
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Private original hashes matched. Local replay independently transcribed equivalent v23/v30 features and comparison, not execution of the newly committed model_comparison.py itself. Fixed first-day 100 stocks, reviewed history, not prospective evidence; no portfolio returns or verified fills. Precision means >=3% net return among selected signals, unknowns included as misses. Model comparison commit requires separate CI. No raw data or fitted weights committed."
+}

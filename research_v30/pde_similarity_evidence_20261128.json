@@ -1,0 +1,64 @@
+{
+  "source_cohort": 966400,
+  "ranked_rows": 139800,
+  "matched_rows": 84429,
+  "matched_symbols": 827,
+  "fold_test_rows": [
+    18437,
+    20692,
+    10982,
+    20539
+  ],
+  "features": 7,
+  "lags": [
+    0,
+    5,
+    10,
+    15,
+    20,
+    30,
+    40,
+    50,
+    60
+  ],
+  "neighbors": 50,
+  "training_cap_per_fold": 10000,
+  "comparisons": 224,
+  "classification_comparisons": 24,
+  "local_tests_passed": 3,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "replay_sha256": "28acfff0d2521bd68c5202e7171555a5caedeae0cd0de550618617bd22e72634",
+  "metrics_sha256": "7b5270b6f44d9898b1d519c61011e23c95476665027773e6931ea932d40331ac",
+  "scope300_mean_auc": {
+    "static": [
+      0.514272,
+      0.626814
+    ],
+    "path20": [
+      0.517791,
+      0.632028
+    ],
+    "path60": [
+      0.521662,
+      0.635748
+    ]
+  },
+  "scope300_mean_fold_return_120bps_full_loss": {
+    "liquidity": -6.965781,
+    "static_rise": -24.162942,
+    "static_joint": -16.980034,
+    "path20_rise": -22.3206,
+    "path20_joint": -13.107734,
+    "path60_rise": -20.656726,
+    "path60_joint": -12.315113
+  },
+  "scope300_mean_fold_return_120bps_principal_recovery": {
+    "liquidity": 0.534219,
+    "static_joint": -4.817444,
+    "path20_joint": -10.339327,
+    "path60_joint": -9.642939
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Previously reviewed folds only, equal matched 60-session snapshot coverage, not a continuous raw price series or DTW. Exact lag snapshots, not proof of uninterrupted intermediate sessions; deterministic training sample capped at 10,000 rows, fixed K=50, clipped robust scaling fitted on training only, no neighbor diversity constraint. Overlapping historical samples not independent, uncalibrated neighbor fractions. No investor flows, independent forward data, verified fills or comparison against entire live NOVA pipeline. Full-loss and principal recovery are stress assumptions. Latest CI unverified."
+}

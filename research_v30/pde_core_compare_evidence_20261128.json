@@ -1,0 +1,60 @@
+{
+  "reference_commit": "012a5a5da8072b3f95531d127469a6e987d24aab",
+  "reference_rule": "core_comparison._core_at",
+  "source_rows": 1995617,
+  "source_cohort": 966400,
+  "matched_rows": 115729,
+  "matched_symbols": 993,
+  "reconstructed_rows": 536613,
+  "reconstructed_buy": 42084,
+  "comparisons": 160,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "replay_sha256": "c106a5fe705d219fb548e919638d97228fabdff9f315bc09efbc01dc6578d6ef",
+  "coverage_sha256": "13300cd3483e27bd73a5577f69107f4286cdb2a696f54871381a9bdfe7e10d00",
+  "scope300": {
+    "eligible": 89149,
+    "core_signals": 13125,
+    "clean_total": 18392,
+    "clean_core": 2780,
+    "clean_missed": 15612,
+    "unknown": 1073
+  },
+  "mean_return_120bps_full_loss": {
+    "top100": {
+      "liquidity": -6.13709,
+      "core": 1.03124,
+      "core_pde_rank": 1.576074,
+      "pde": -15.170544,
+      "core_plus_pde": -6.825894
+    },
+    "top300": {
+      "liquidity": -6.13709,
+      "core": 1.03124,
+      "core_pde_rank": 0.861023,
+      "pde": -6.963985,
+      "core_plus_pde": -4.519558
+    }
+  },
+  "mean_return_120bps_principal_recovery": {
+    "top100": {
+      "core": 3.53124,
+      "core_pde_rank": 1.576074
+    },
+    "top300": {
+      "core": 3.53124,
+      "core_pde_rank": 0.861023
+    }
+  },
+  "top100_mean_candidate_adverse_rate": {
+    "core": 0.425455,
+    "core_pde_rank": 0.273369
+  },
+  "top100_mean_candidate_clean_precision": {
+    "core": 0.242507,
+    "core_pde_rank": 0.150957
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Actual retrospective replay using vectorized reconstruction of fixed research 5-Core rule on uninterrupted segments. Not actual historical NOVA recommendations or entire production decision stack. Matched complete-lag daily top300 subset of 993 symbols; no future independent data, actual fills, flow or historical point-in-time publication. Two new parity tests registered but CI unverified. Fixed candidate selection, maximum two per day, unknown outcomes stress only. Code local imports adapted to package. Results do not establish robust superiority."
+}

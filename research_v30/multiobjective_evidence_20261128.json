@@ -1,0 +1,58 @@
+{
+  "cohort": 47603,
+  "known_five_day": 46946,
+  "horizon": 1,
+  "source": "cached reconstructed v30 KRX cohort",
+  "rules": 6,
+  "comparison_rows": 24,
+  "roundtrip_bps": [
+    60,
+    120
+  ],
+  "validation_60bps": {
+    "up_only": {
+      "signals": 354,
+      "known": 352,
+      "precision": 0.149718,
+      "mean_net_pct": -0.705622,
+      "loss5": 0.130682
+    },
+    "joint": {
+      "signals": 354,
+      "known": 353,
+      "precision": 0.076271,
+      "mean_net_pct": -0.735907,
+      "loss5": 0.01983
+    },
+    "joint_abstain": {
+      "signals": 11,
+      "known": 11,
+      "precision": 0.272727,
+      "mean_net_pct": -1.589122,
+      "loss5": 0.181818
+    },
+    "liquidity": {
+      "signals": 354,
+      "known": 354,
+      "mean_net_pct": -0.143528
+    }
+  },
+  "development_joint_abstain": {
+    "signals": 79,
+    "mean_net_pct": 2.380599
+  },
+  "gate": {
+    "joint": false,
+    "joint_abstain": false,
+    "mean_only": false
+  },
+  "local_checks": [
+    "held-out label perturbation leaves scores unchanged",
+    "daily top-two cap",
+    "cohort size parity"
+  ],
+  "reviewed_holdout_evaluated": false,
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Fixed exploratory weights and abstention threshold, repeatedly reviewed development/validation data, no independent future evidence. Loss5 measures next-open-to-close realized outcome among known labels, not intraday drawdown. Unknown pessimistic daily slot sensitivity is not portfolio return. New CI not yet verified."
+}

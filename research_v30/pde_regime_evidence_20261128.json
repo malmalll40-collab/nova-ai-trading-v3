@@ -1,0 +1,35 @@
+{
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "replay_sha256": "f28b5c76da86c21f9769762cae1ef67e1a593ce38f8d86696f3fd3863d1d8528",
+  "coverage_sha256": "f2b0892aa99eba6f27c581b72d743c5392a54095d7b1c9aa30beb46563d0c1cf",
+  "comparisons": 128,
+  "features": 42,
+  "regime_training_eligible": 11,
+  "regime_training_total": 12,
+  "local_assertion_groups_passed": 3,
+  "mean_fold_return_120bps_total_loss": {
+    "top100": {
+      "liquidity": -6.13709,
+      "global": -11.912878,
+      "specialist": -14.415994,
+      "blend": -15.170544
+    },
+    "top300": {
+      "liquidity": -6.13709,
+      "global": -12.545518,
+      "specialist": -10.585976,
+      "blend": -6.963985
+    }
+  },
+  "mean_fold_return_120bps_principal_recovery": {
+    "top300": {
+      "liquidity": 1.36291,
+      "global": -7.370493,
+      "specialist": -5.640757,
+      "blend": -2.007618
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Retrospective previously reviewed folds; complete-lag matched universe; fixed regime +/-2%, minimum 20 days and 100 observations per class, fixed 50/50 blend, not optimized. Unknown scenarios not realized losses. No original NOVA signal history, investor flows, verified fills or independent forward test. Local code used direct module imports; repository uses package imports. Latest CI not confirmed."
+}

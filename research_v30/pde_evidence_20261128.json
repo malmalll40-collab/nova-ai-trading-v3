@@ -1,0 +1,73 @@
+{
+  "source_cohort": 966400,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "csv_sha256": "ea00feb6a63d548acb8530d69273efb51a02adca6893b57b74bfa6dc4b625a35",
+  "patterns_sha256": "d5277500fe5050d23cbf3f16a1b9cc19cd9ec433f14dee9bdff5a746beea8c97",
+  "candidate_paths": 84,
+  "accepted": 1,
+  "comparisons": 64,
+  "local_unit_tests": 3,
+  "features": 21,
+  "fold_returns_120bps_stress": {
+    "liquidity": [
+      -8.186175,
+      -22.13641,
+      12.104423,
+      0.598727
+    ],
+    "pde": [
+      0,
+      0,
+      0,
+      2.250395
+    ],
+    "pde_consensus": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "cash": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "accepted_rule": {
+    "conditions": [
+      [
+        "vol20",
+        ">",
+        0.02589500416070223
+      ],
+      [
+        "ret20",
+        "<=",
+        0.4847537577152252
+      ],
+      [
+        "turnover_ratio20",
+        "<=",
+        1.1122339963912964
+      ]
+    ],
+    "cal_samples": 372,
+    "cal_known": 366,
+    "cal_precision": 0.2956989247311828,
+    "cal_adverse": 0.24863387978142076,
+    "cal_mean": 0.8298793180092946,
+    "cal_baseline_precision": 0.24533333333333332,
+    "cal_baseline_adverse": 0.2769857433808554,
+    "test_matches": 1430,
+    "test_candidates": 172,
+    "test_trades": 60,
+    "test_unknown": 1,
+    "test_candidate_precision": 0.284884,
+    "test_candidate_adverse": 0.444444
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Locally executed on reviewed historical cache, top100 liquidity per day, fixed five-session horizon and three tree objectives. No existing historical NOVA signal join, no investor flow, no temporal sequence discovery, no independent future test. Calibration lower bound is a heuristic, not a confidence interval corrected for overlapping returns or multiple testing. Candidate metrics are not executed trade metrics. Full-loss unknown outcome is a stress assumption. No mark-to-market drawdown. Three local tests passed; latest remote CI not yet verified."
+}

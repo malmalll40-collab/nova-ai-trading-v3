@@ -1,0 +1,76 @@
+{
+  "source_cohort": 966400,
+  "matched_rows": 115729,
+  "reconstructed_buy": 42084,
+  "comparisons": 160,
+  "calibration_rows": 8,
+  "baseline_reconciled_rows": 32,
+  "local_tests_passed": 3,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "replay_sha256": "efc05b9a913294f231f87e28764e6e12b1d70fb98dcc072a2b15fa19ac93f1ad",
+  "calibration_sha256": "326d355384d5f9589d9fbd8293f0ee936538588700c70bb46d3bba34602c74c2",
+  "active_folds": [
+    true,
+    false,
+    false,
+    true
+  ],
+  "calibration_candidates": [
+    26,
+    0,
+    14,
+    36
+  ],
+  "risk_auc_active": [
+    0.5,
+    0.764459
+  ],
+  "mean_fold_return_pct_120bps_full_loss": {
+    "core": 1.03124,
+    "veto_p50": 4.688446,
+    "veto_q80": 4.688446,
+    "veto_q90": 2.936259,
+    "cash": 0
+  },
+  "mean_fold_return_pct_120bps_principal_recovery": {
+    "core": 3.53124,
+    "veto_p50": 4.688446,
+    "veto_q80": 4.688446,
+    "veto_q90": 5.436259,
+    "cash": 0
+  },
+  "fold_returns_p50_120bps_full_loss": [
+    0,
+    8.156585,
+    -0.066992,
+    10.664191
+  ],
+  "candidate_counts": {
+    "core": {
+      "candidates": 346,
+      "clean_winners": 114,
+      "trades": 158,
+      "unknown": 1
+    },
+    "veto_p50": {
+      "candidates": 253,
+      "clean_winners": 92,
+      "trades": 117,
+      "unknown": 0
+    }
+  },
+  "mean_fold_candidate_metrics": {
+    "core": {
+      "precision": 0.242507,
+      "adverse": 0.425455
+    },
+    "veto_p50": {
+      "precision": 0.388345,
+      "adverse": 0.328314
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Reconstructed fixed research 5-Core, not live NOVA final recommendations. Previously reviewed folds, no independent future data. Two folds used unchanged baseline due to insufficient calibration candidates; first active fold had only four known evaluation candidates, final fold drives gains. 0.5 is an uncalibrated model score cutoff, not a certified probability. Alternative quantile vetoes compared, no production choice. Candidate metrics averaged over nonempty folds; veto reduces total clean winners. Top100 and top300 candidate sets identical. Full-loss and principal recovery scenarios are not actual returns. No real fills, investor flow, daily marked-to-market drawdown. Latest CI unverified."
+}

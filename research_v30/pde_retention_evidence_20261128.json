@@ -1,0 +1,27 @@
+{
+  "source_cohort": 966400,
+  "matched_rows": 115729,
+  "comparisons": 128,
+  "calibration_rows": 24,
+  "active": 0,
+  "reasons": {
+    "insufficient_calibration": 18,
+    "no_safe_threshold": 6
+  },
+  "replay_sha256": "6400e1976f437c14db52ae877e17439ecc8fbc10e1e5848f6c5d86f2fbd58e8d",
+  "calibration_sha256": "584e7b4ff3231ce684311b6d38c33347ff3c2a7be7cdc3f3d20b37f28930b16a",
+  "thresholds": {
+    "winner_retention_min": 0.85,
+    "candidate_retention_min": 0.75,
+    "risk_reduction_min": 0.03
+  },
+  "all_policies_top100_120bps": {
+    "candidates": 346,
+    "clean_winners": 114,
+    "trades": 158,
+    "mean_fold_return_full_loss": 1.03124,
+    "mean_fold_return_principal_recovery": 3.53124
+  },
+  "adoption": "HOLD",
+  "limitations": "Previously reviewed historical folds; no activation, actual NOVA live signals, investor flows or prospective test. Risk AUC evaluation is descriptive only. No evidence of incremental return. Latest CI unverified."
+}

@@ -1,0 +1,45 @@
+{
+  "cohort": 966400,
+  "portfolio_comparisons": 80,
+  "regime_comparisons": 48,
+  "validation_days": {
+    "up": 137,
+    "flat": 31,
+    "down": 9
+  },
+  "csv_sha256": "6a8cfcd953b6a3906f905da74d0002f0e43a47aeef7d9937159e965f4942da8d",
+  "regime_csv_sha256": "4a09454cdb8209eecfa688a20bc6a438e3376f8eee68b61e360645bd03472851",
+  "validation_60bps_unknown_total_loss": {
+    "liquidity": {
+      "3": 23.477789,
+      "5": 17.453818
+    },
+    "liquidity_guard": {
+      "3": 24.537047,
+      "5": 18.520693
+    },
+    "joint": {
+      "3": -76.510098,
+      "5": -77.272777
+    },
+    "joint_guard": {
+      "3": -76.222069,
+      "5": -77.103877
+    },
+    "liquid_joint_guard": {
+      "3": -8.85875,
+      "5": -2.672567
+    }
+  },
+  "development_120bps_unknown_total_loss_liquidity_guard": {
+    "3": -33.057816,
+    "5": -26.615075
+  },
+  "validation_120bps_unknown_total_loss_liquidity_guard": {
+    "3": 17.510777,
+    "5": 14.222387
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Fixed 10% initial capital tickets, next open entry and scheduled close exit, no duplicate positions. Unknown outcomes stressed at zero or full original principal recovery, neither is a realized outcome. In-sample development and repeatedly reviewed validation; 9 down days in validation. No daily mark-to-market equity or verified execution. No investor flows. Local run reproduced from the checked cache; latest CI unverified."
+}

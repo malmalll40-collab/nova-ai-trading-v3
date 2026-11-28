@@ -1,0 +1,89 @@
+{
+  "source_rows": 1995617,
+  "source_cohort": 966400,
+  "matched_rows": 115729,
+  "known_rows": {
+    "1": 115453,
+    "3": 114906,
+    "5": 114374,
+    "10": 113066,
+    "20": 110596
+  },
+  "horizons": [
+    1,
+    3,
+    5,
+    10,
+    20
+  ],
+  "comparisons": 480,
+  "classification_comparisons": 40,
+  "local_tests_passed": 3,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "replay_sha256": "9854a9d11443425c99217a8c131005578a88405c97752a3a20dfe7344453c2c4",
+  "metrics_sha256": "1b2a483d2b8cf80d411dad5f37e1c4b7a418bf2f5a91a6d0dfabdba7377f009b",
+  "scope300_mean_clean_auc": [
+    0.63047,
+    0.578771,
+    0.548323,
+    0.553615,
+    0.573814
+  ],
+  "scope300_mean_risk_auc": [
+    0.704551,
+    0.672001,
+    0.662652,
+    0.654649,
+    0.649283
+  ],
+  "scope300_mean_return_120bps_full_loss": {
+    "liquidity": [
+      -16.670872,
+      -5.27251,
+      -2.896104,
+      -0.32096,
+      1.136362
+    ],
+    "single": [
+      -17.89782,
+      -15.272118,
+      -12.675466,
+      -4.494083,
+      -5.168389
+    ],
+    "multi": [
+      -14.312416,
+      -8.144521,
+      -8.643537,
+      -6.422884,
+      -7.648766
+    ]
+  },
+  "scope300_mean_return_120bps_principal_recovery": {
+    "liquidity": [
+      -14.170872,
+      -2.77251,
+      -0.396104,
+      2.17904,
+      3.636362
+    ],
+    "single": [
+      -17.89782,
+      -7.772118,
+      -5.175466,
+      -1.994083,
+      2.464421
+    ],
+    "multi": [
+      -14.312416,
+      -5.644521,
+      -3.643537,
+      -1.020614,
+      4.573301
+    ]
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Previously reviewed folds, common 20-session embargo and evaluation cutoff, complete lag features, equal-weight score aggregation chosen in advance, fixed 3% net / -5% adverse labels across horizons. Different holding periods have different turnover and exposure. Unknown outcomes stressed at full loss or principal recovery, not observed fills. Four folds were executed separately to avoid runtime timeout and concatenated with uniqueness checks. No flow inputs, original production recommendation histories, independent forward test or verified fills. Latest remote CI not yet verified."
+}

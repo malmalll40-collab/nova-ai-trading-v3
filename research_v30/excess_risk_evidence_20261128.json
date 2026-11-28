@@ -1,0 +1,43 @@
+{
+  "cohort": 966400,
+  "cache_sha256": "db4e78cbf124701be438500dd78810250a39e52ef2bb5a2dd545e8366141032c",
+  "comparisons": 16,
+  "validation_60bps": {
+    "liquidity": {
+      "signals": 354,
+      "known": 354,
+      "mean_net_pct": -0.119337,
+      "top_vol_quintile": 0.330508,
+      "mean_gross_excess_pct": 0.542984,
+      "loss5": 0.014124
+    },
+    "up": {
+      "signals": 354,
+      "known": 354,
+      "mean_net_pct": -0.980321,
+      "top_vol_quintile": 0.711864,
+      "mean_gross_excess_pct": -0.323181,
+      "loss5": 0.127119
+    },
+    "excess": {
+      "signals": 354,
+      "known": 354,
+      "mean_net_pct": -0.596907,
+      "top_vol_quintile": 0.830508,
+      "mean_gross_excess_pct": 0.062541,
+      "loss5": 0.118644
+    },
+    "risk_scaled": {
+      "signals": 354,
+      "known": 349,
+      "mean_net_pct": -0.523001,
+      "top_vol_quintile": 0,
+      "mean_gross_excess_pct": 0.139026,
+      "loss5": 0,
+      "conservative_daily": -1.928044
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Benchmark is equal-weight resolved same-day eligible stock returns, not official market index. Gross excess excludes transaction costs. Risk-scaled rule has five unknown outcomes; zero known loss5 does not mean risk free. In-sample development, repeatedly reviewed validation. No causality established, no independent prospective evidence. New commit CI not verified."
+}

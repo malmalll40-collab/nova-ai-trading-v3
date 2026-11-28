@@ -1,0 +1,52 @@
+{
+  "raw_rows": 1995617,
+  "common_cohort": 966400,
+  "development": 599299,
+  "development_known": 598225,
+  "validation": 367101,
+  "validation_known": 366362,
+  "cache_sha256": "db4e78cbf124701be438500dd78810250a39e52ef2bb5a2dd545e8366141032c",
+  "csv_sha256": "e7db7a1b7cc43f236388e3ef898a0e90ac9b95f3af810538d8b771cf57d25c0b",
+  "seconds": {
+    "prepare": 22.95,
+    "liquidity": 2.11,
+    "base": 5.51,
+    "turnover": 6.02,
+    "rank": 6.66,
+    "both": 7.11
+  },
+  "rows": 20,
+  "validation_60bps": {
+    "liquidity": {
+      "precision": 0.09322,
+      "mean_net_pct": -0.119337
+    },
+    "base": {
+      "auc": 0.710699,
+      "ap": 0.113172,
+      "precision": 0.112994,
+      "mean_net_pct": -0.980321
+    },
+    "turnover": {
+      "auc": 0.71065,
+      "ap": 0.113142,
+      "precision": 0.115819,
+      "mean_net_pct": -0.963572
+    },
+    "rank": {
+      "auc": 0.713051,
+      "ap": 0.11559,
+      "precision": 0.118644,
+      "mean_net_pct": -1.049208
+    },
+    "both": {
+      "auc": 0.713072,
+      "ap": 0.115602,
+      "precision": 0.115819,
+      "mean_net_pct": -1.043343
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Local actual replay using trusted local cache, float32 features for all rules; identical cohorts and cache hashes verified across 20 rows, known+unknown=signals. Compared historical development/validation only. Previously reviewed data; no independent prospective evidence, no portfolio return, no verified fills. New staged replay CI not verified. Timings specific to this execution environment."
+}

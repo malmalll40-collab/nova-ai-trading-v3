@@ -1,0 +1,74 @@
+{
+  "source_rows": 966400,
+  "before_matching": 139800,
+  "matched": 115729,
+  "features": {
+    "static": 21,
+    "sequence": 41
+  },
+  "comparisons": 96,
+  "classification_comparisons": 16,
+  "local_tests_passed": 3,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "replay_sha256": "42dda61ba468816a70450e2537742621c4cfb4fc5280ae298d91572b5bab124b",
+  "metrics_sha256": "ad2d8b3d4e052ff90d83d386f6fca95a248bd04747ef75b330712357bc654d18",
+  "mean_fold_return_120bps_stress": {
+    "top100": {
+      "liquidity": -6.13709,
+      "static": -14.48032,
+      "sequence": -10.24758
+    },
+    "top300": {
+      "liquidity": -6.13709,
+      "static": -20.06444,
+      "sequence": -13.30131
+    }
+  },
+  "mean_fold_return_120bps_principal_recovery": {
+    "top100": {
+      "liquidity": 1.36291,
+      "static": -1.980317,
+      "sequence": -2.74758
+    },
+    "top300": {
+      "liquidity": 1.36291,
+      "static": -7.274351,
+      "sequence": -8.516914
+    }
+  },
+  "mean_risk_auc": {
+    "top100": {
+      "static": 0.65129,
+      "sequence": 0.65535
+    },
+    "top300": {
+      "static": 0.65361,
+      "sequence": 0.65822
+    }
+  },
+  "mean_clean_auc": {
+    "top100": {
+      "static": 0.5331,
+      "sequence": 0.52998
+    },
+    "top300": {
+      "static": 0.55589,
+      "sequence": 0.55394
+    }
+  },
+  "mean_candidate_adverse_rate": {
+    "top100": {
+      "liquidity": 0.32449,
+      "static": 0.17991,
+      "sequence": 0.15236
+    },
+    "top300": {
+      "liquidity": 0.32449,
+      "static": 0.16992,
+      "sequence": 0.18471
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Reviewed historical folds only; matched complete exact-lag cases, rank from full daily cache. Two prespecified sequence flags and 18 interval deltas; no proof that the event order itself drives performance. Candidate-level risk metrics, not executed trade metrics. Unknown outcomes stress scenarios, not actual returns. No actual NOVA signals, flows, verified execution, or independent prospective test. Latest remote CI not confirmed."
+}

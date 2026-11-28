@@ -1,0 +1,50 @@
+{
+  "source_cohort": 966400,
+  "matched_rows": 115729,
+  "comparisons": 256,
+  "classification_comparisons": 16,
+  "coverage_rows": 8,
+  "baseline_reconciled_rows": 64,
+  "local_tests_passed": 3,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "replay_sha256": "eec3ed1afd7f946115a1993a4da09cb8c1b4b91f8abe24de6470d03846ef7b82",
+  "metrics_sha256": "a0c796f80ae5961b49655205edf01667ccd067220edaa3f9fae4f4e0417abf5d",
+  "coverage_sha256": "d0fe0c724212f2787a743b9c41c405963f233e1c6ca5c065350b9700762b24d1",
+  "scope300": {
+    "eligible": 89149,
+    "known": 88076,
+    "absolute_winners": 18392,
+    "alpha_winners": 14798,
+    "both": 12936,
+    "core_both": 1973
+  },
+  "scope300_mean_auc": {
+    "absolute": [
+      0.55394,
+      0.542611
+    ],
+    "alpha": [
+      0.538169,
+      0.542705
+    ]
+  },
+  "scope300_return_120bps_full_loss": {
+    "core": 1.03124,
+    "liquidity": -6.13709,
+    "absolute": -13.301314,
+    "alpha": -13.344393,
+    "blend": -15.660699,
+    "fill_absolute": -8.525281,
+    "fill_alpha": -9.623883,
+    "fill_blend": -12.469205
+  },
+  "scope300_return_120bps_principal_recovery": {
+    "core": 3.53124,
+    "alpha": -8.342368,
+    "fill_alpha": -2.693709
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Market-relative geometric excess versus matching KOSPI/KOSDAQ index next open to fifth close, implicit unit beta, not causal attribution or factor-adjusted alpha. Same prior reviewed folds. Index outcomes are labels only, training embargo five sessions. Absolute clean and relative clean overlap. Fixed thresholds and models; no actual production recommendations or independent future observations, sector attribution, flow, execution proof. First full run timed out after three folds; all four replayed separately and outputs combined with uniqueness checks. Latest CI unverified."
+}

@@ -1,0 +1,52 @@
+{
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "csv_sha256": "39524b50a04c3f32c58b7a6b1c48eecea53dd7038235e44365be05c7af400a0f",
+  "raw_rows": 1995617,
+  "source_cohort": 966400,
+  "candidates": 692,
+  "folds": 4,
+  "comparisons": 224,
+  "local_tests_passed": 5,
+  "fixed_horizon_reconciled": true,
+  "mean_fold_return_120bps_full_loss_stress": {
+    "fixed1": [
+      -22.021797,
+      -18.31137
+    ],
+    "fixed3": [
+      -8.583701,
+      -5.190977
+    ],
+    "fixed5": [
+      -4.404859,
+      -3.511538
+    ],
+    "stop3_target6": [
+      -8.644811,
+      -6.751367
+    ],
+    "stop5_target10": [
+      -7.775112,
+      -5.619062
+    ],
+    "vol_stop_target": [
+      -5.078194,
+      -5.325047
+    ],
+    "trail4": [
+      -6.883137,
+      -5.700882
+    ]
+  },
+  "fixed5_cap_mean_fold_return_principal_recovery": 3.988462,
+  "fixed5_cap_fold_returns_120bps_full_loss": [
+    -8.492861,
+    -22.915471,
+    12.392032,
+    4.970149
+  ],
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Only fixed liquidity top-two proxy; no PDE hybrid or actual NOVA signal replay. Same already-reviewed folds. Costs modeled as equal buy/sell fractional fees. Entry gap limit uses next observed open and assumes possible same-open conditional execution; no auction, queue, tick rounding, market impact, fill proof, or daily mark-to-market. Stop/target collision pessimistic; stop gaps use open, targets capped at limit; intraday exits credited at close; trailing high updated only for next day. Unknown path full-loss or principal-recovery is a stress scenario, not observed return. No independent forward test or investor flow. Latest CI not verified."
+}
