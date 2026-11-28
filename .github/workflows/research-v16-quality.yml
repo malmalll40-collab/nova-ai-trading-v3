@@ -1,0 +1,19 @@
+name: NOVA v16 offline quality gate
+on:
+  pull_request:
+    paths:
+      - research_v16/**
+      - .github/workflows/research-v16-quality.yml
+permissions:
+  contents: read
+jobs:
+  synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "numpy<3" "pandas<3" "scikit-learn<2" openpyxl
+      - run: cd research_v16 && python -m unittest -v test_quality.py && python -m py_compile model.py
