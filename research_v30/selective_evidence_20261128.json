@@ -1,0 +1,50 @@
+{
+  "cohort": 47603,
+  "horizon": 1,
+  "model": "fixed LightGBM",
+  "regimes": [
+    "all",
+    "up",
+    "flat",
+    "down"
+  ],
+  "regime_definition": "prior index 20-session return >2%, <-2%, otherwise flat",
+  "quantiles": [
+    0,
+    0.8,
+    0.9,
+    0.95,
+    0.98
+  ],
+  "candidate_count": 20,
+  "comparison_rows": 80,
+  "passed": 0,
+  "minimum_known_per_phase": 30,
+  "roundtrip_bps": [
+    60,
+    120
+  ],
+  "best_validation_at_120bps": {
+    "regime": "flat",
+    "quantile": 0.95,
+    "signals": 27,
+    "known": 27,
+    "precision": 0.2962962962962963,
+    "mean_net_pct": 0.335796,
+    "development_mean_net_pct": -0.784982
+  },
+  "holdout_evaluated": false,
+  "local_checks": [
+    "actual cohort and fail-closed gate",
+    "unchanged scores after altering non-development labels",
+    "deterministic ranking",
+    "missing outcome penalty and idle days"
+  ],
+  "prior_ci": {
+    "run_id": 46133634305,
+    "conclusion": "success",
+    "commit": "9b63318ed6e978550cbab11cb910ebdd2a756027"
+  },
+  "adoption": "HOLD",
+  "limitations": "Replay used cached reconstructed v30 cohort; no independent prospective data. Candidate grid exploratory after earlier research. Known-return mean is not portfolio return. No production or order change. New commit CI not yet verified."
+}
