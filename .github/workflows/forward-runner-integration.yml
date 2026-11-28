@@ -39,3 +39,4 @@ jobs:
       - name: Verify exact frozen strategy hash
         run: echo "55faf64cc2f02175b3fc0c424f75d1211e504d35264dfae9d7092af81cbdd6f6  forward_shadow/forward.py" | sha256sum -c -
       - run: python integration_checks/forward_runner_postgres.py
+      - run: python integration_checks/forward_scheduler_postgres.py

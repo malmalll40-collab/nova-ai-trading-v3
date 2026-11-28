@@ -88,6 +88,11 @@ async def _app_lifespan(application):
                 emit('forward_seed_restore',{'status':'BLOCKED','reason':reason,'orders_enabled':False})
         threading.Thread(target=verify_forward_seed,daemon=True,name='nova-forward-seed-verify').start()
     stop_preflight = threading.Event()
+    install_forward_snapshot(_ops_preflight_snapshot)
+    if os.getenv('NOVA_FORWARD_BRIDGE_ON_START')=='1':
+        from forward_shadow.scheduler import bridge,install_snapshot
+        install_snapshot(_ops_preflight_snapshot)
+        threading.Thread(target=bridge,args=(stop_preflight,),daemon=True,name='nova-forward-bridge').start()
     # Explicit owner-authorized rollout only; disabled by default.
     if os.getenv('NOVA_RESEARCH_ACTIVATION')=='1':
         try:
@@ -125,6 +130,8 @@ from research_forward_seed_api import router as forward_seed_router
 app.include_router(forward_seed_router)
 from forward_shadow.api import router as forward_run_router
 app.include_router(forward_run_router)
+from forward_shadow.scheduler import router as forward_scheduler_router, install_snapshot as install_forward_snapshot
+app.include_router(forward_scheduler_router)
 CACHE_LOCK = threading.Lock()
 # Exact-key locks coalesce identical requests without unrelated hash collisions.
 # Reference counts include waiters; the registry is bounded by active requests.

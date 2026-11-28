@@ -71,6 +71,17 @@ class Tests(unittest.TestCase):
         self.assertEqual(d['report']['closed_assumed'],0)
         self.assertEqual(self.run_at('2026-11-30T19:00:00+09:00')['state'],'NO_SESSION_READY')
         self.assertEqual(len(self.calls),12)
+    def test_bridge_cutoff_prevents_future_dispatch(self):
+        for day in ('20261126','20261127'):
+            out=r.run(self.store,'fixture',clock=lambda:datetime.fromisoformat('2026-11-30T19:00:00+09:00'),fetch=self.fetch,pause=lambda _:None,latest_day='20261127')
+            self.assertEqual(out['day'],day)
+        out=r.run(self.store,'fixture',clock=lambda:datetime.fromisoformat('2026-11-30T19:00:00+09:00'),fetch=self.fetch,pause=lambda _:None,latest_day='20261127')
+        self.assertEqual(out['state'],'BOUND_REACHED')
+        self.assertEqual(len(self.calls),8)
+    def test_admission_denied_before_dispatch(self):
+        with self.assertRaisesRegex(ValueError,'LOCAL_ADMISSION_BLOCKED'):
+            r.run(self.store,'fixture',clock=lambda:datetime.fromisoformat('2026-11-28T14:00:00+09:00'),fetch=self.fetch,pause=lambda _:None,admit=lambda:False)
+        self.assertEqual(len(self.calls),0)
     def test_owner_exclusion(self):
         self.store.acquire('first')
         other=r.Store(self.dsn)

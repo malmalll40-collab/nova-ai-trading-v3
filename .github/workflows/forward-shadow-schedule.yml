@@ -1,0 +1,32 @@
+name: NOVA forward shadow schedule
+on:
+  schedule:
+    - cron: '37 9 * * 1-5'
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+concurrency:
+  group: nova-forward-shadow-schedule
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Request short-lived identity and run one session
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint='https://nova-ai-trading-v3-mobile.onrender.com/api/research/forward/scheduled'
+          # Never print the assertion, raw provider responses or credentials.
+          token="$(curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            --get --data-urlencode "audience=$endpoint" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -er '.value')"
+          echo "::add-mask::$token"
+          # Exactly one invocation; no retry after an ambiguous dispatch.
+          curl --silent --show-error --fail-with-body --max-time 240 \
+            -X POST -H "Authorization: Bearer $token" "$endpoint" \
+            -o /tmp/nova-forward-result.json
+          jq '{state,day,mode,revision,orders_enabled}' /tmp/nova-forward-result.json

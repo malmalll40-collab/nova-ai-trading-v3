@@ -100,7 +100,7 @@ def eligible_env():
             and os.getenv('NOVA_FORWARD_SEED_ENABLED')!='1'
             and os.getenv('NOVA_FORWARD_VERIFY_ON_START')!='1')
 
-def run(store,key,*,clock=f.now,fetch=c.get_payload,pause=time.sleep):
+def run(store,key,*,clock=f.now,fetch=c.get_payload,pause=time.sleep,latest_day=None,admit=lambda:True):
     if not key.strip():raise ValueError('KRX_KEY_REQUIRED')
     c.verify_frozen();owner=uuid.uuid4().hex
     rev,digest,z,last=store.acquire(owner)
@@ -112,11 +112,15 @@ def run(store,key,*,clock=f.now,fetch=c.get_payload,pause=time.sleep):
             if start<datetime.fromisoformat(f.FREEZE):raise ValueError('CLOCK_BEFORE_FREEZE')
             if f.dayfmt(day)>start.date() or (f.dayfmt(day)==start.date() and start.time()<walltime(18,30)):
                 return {'state':'NO_SESSION_READY','next_day':day,'report':f.report(db),'orders_enabled':False}
+            if latest_day is not None and day>latest_day:
+                return {'state':'BOUND_REACHED','next_day':day,'orders_enabled':False}
+            if not admit():raise ValueError('LOCAL_ADMISSION_BLOCKED')
             with closing(sqlite3.connect(db)) as conn:
                 prior=json.loads(conn.execute('SELECT market_counts FROM sessions WHERE day=?',(last,)).fetchone()[0])
             payloads={}
             with requests.Session() as session:
                 for service in c.SERVICES:
+                    if not admit():raise ValueError('LOCAL_ADMISSION_BLOCKED')
                     body=store.begin(owner,day,service)
                     if body is None:
                         body=fetch(session,service,day,key)
@@ -133,8 +137,8 @@ def run(store,key,*,clock=f.now,fetch=c.get_payload,pause=time.sleep):
     finally:
         store.release(owner)
 
-def execute():
+def execute(*,latest_day=None,admit=lambda:True):
     if not eligible_env():raise ValueError('EXPLICIT_ENABLE_AND_LEGACY_OFF_REQUIRED')
     s=Store(os.getenv('DATABASE_URL','').strip())
-    try:return run(s,os.getenv('KRX_API_KEY','').strip())
+    try:return run(s,os.getenv('KRX_API_KEY','').strip(),latest_day=latest_day,admit=admit)
     finally:s.close()
