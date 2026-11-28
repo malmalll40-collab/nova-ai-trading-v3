@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-28",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "raw_rows": 1995617,
+  "eligible": 415309,
+  "known": 409200,
+  "unresolved": 6109,
+  "train_rows": 178281,
+  "validation": {
+    "liquidity": {
+      "mean_net_pct": 3.545262,
+      "loss5_pct": 8.857143,
+      "unknown": 4,
+      "signals": 354
+    },
+    "model_return": {
+      "mean_net_pct": 0.906785,
+      "loss5_pct": 21.082621,
+      "unknown": 3,
+      "signals": 354
+    },
+    "model_risk": {
+      "mean_net_pct": 0.165997,
+      "loss5_pct": 5.382436,
+      "unknown": 1,
+      "signals": 354,
+      "pessimistic_daily_lower95_pct": -0.811272
+    }
+  },
+  "reviewed_holdout": {
+    "liquidity": {
+      "mean_net_pct": -0.393129,
+      "unknown": 25,
+      "signals": 356
+    },
+    "model_return": {
+      "mean_net_pct": -2.432398,
+      "unknown": 6,
+      "signals": 356
+    },
+    "model_risk": {
+      "mean_net_pct": -1.998045,
+      "loss5_pct": 27.76204,
+      "unknown": 3,
+      "signals": 356
+    }
+  },
+  "loss_auc": {
+    "development": 0.709982,
+    "validation": 0.648572,
+    "reviewed_holdout": 0.536192
+  },
+  "gate_pass": false,
+  "training_ready": false,
+  "production_adoption": "HOLD",
+  "orders_enabled": false,
+  "notes": "Locally measured aggregate research evidence, no raw data or model weights. Overlapping per-signal outcomes, not portfolio returns. Previously reviewed historical test data; not independent evidence. Corporate events and adjusted prices not independently verified."
+}
