@@ -1,0 +1,10 @@
+phase,strategy,signals,unknown,mean_net_pct
+development,liquidity,588,5,-0.5665109789076135
+development,roles13,581,12,0.192331286406865
+development,core5,188,6,0.3038446802913914
+reviewed_holdout,liquidity,356,9,-0.4564758305840172
+reviewed_holdout,roles13,316,9,-1.108084584373342
+reviewed_holdout,core5,99,6,-2.614551309872286
+validation,liquidity,354,4,3.545261784376727
+validation,roles13,354,4,2.932363334480702
+validation,core5,304,4,2.124628325092474

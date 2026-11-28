@@ -1,0 +1,39 @@
+{
+  "eligible": 47603,
+  "known": 46946,
+  "unknown": 657,
+  "baseline_parity": 9,
+  "comparisons": 30,
+  "local_tests": 4,
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "mean_net_pct": {
+    "development": {
+      "liquidity": -0.566511,
+      "roles13": 0.192331,
+      "core5": 0.303845,
+      "reversal5": -0.604102,
+      "reversal5_volscaled": -0.701268
+    },
+    "validation": {
+      "liquidity": 3.545262,
+      "roles13": 2.932363,
+      "core5": 2.124628,
+      "reversal5": 0.535414,
+      "reversal5_volscaled": 0.567466
+    },
+    "reviewed_holdout": {
+      "liquidity": -0.456476,
+      "roles13": -1.108085,
+      "core5": -2.614551,
+      "reversal5": -1.514253,
+      "reversal5_volscaled": -1.065189
+    }
+  },
+  "gate": {
+    "reversal5": false,
+    "reversal5_volscaled": false
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Exploratory fixed five-day proxies, not reproduction of a particular published paper; no independent future data. Conditional on resolved labels, overlapping opportunities, not portfolio returns. Cost stress and unknown sensitivities in replay code. Local private run matched nine reference rows; repository CI pending."
+}
