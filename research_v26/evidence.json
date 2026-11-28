@@ -1,0 +1,54 @@
+{
+  "eligible": 47603,
+  "known": 46946,
+  "unknown": 657,
+  "common": 47603,
+  "baseline_parity": 6,
+  "local_tests": 4,
+  "mean_net_pct_60bps": {
+    "development": [
+      -0.566511,
+      -0.587437,
+      -0.07434,
+      -0.624212,
+      -0.03781
+    ],
+    "validation": [
+      3.545262,
+      1.185549,
+      1.173984,
+      0.922419,
+      0.632914
+    ],
+    "reviewed_holdout": [
+      -0.456476,
+      -0.828393,
+      -1.462121,
+      -0.675029,
+      -0.672761
+    ]
+  },
+  "strategy_order": [
+    "liquidity",
+    "relative20",
+    "residual20",
+    "residual_reversal5",
+    "hybrid_pullback"
+  ],
+  "reviewed_holdout_loss5_pct": [
+    34.293948,
+    33.802817,
+    35.774648,
+    31.728045,
+    31.750742
+  ],
+  "gate": {
+    "relative20": false,
+    "residual20": false,
+    "residual_reversal5": false,
+    "hybrid_pullback": false
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "source": "Actual private local replay; market-only proxy inspired by Blitz, Huij and Martens (2011), https://repub.eur.nl/pub/22252/; not full paper replication. Prior reviewed history, index identities and corporate actions not independently verified."
+}

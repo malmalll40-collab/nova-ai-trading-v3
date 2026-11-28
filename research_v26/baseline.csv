@@ -1,0 +1,7 @@
+phase,roundtrip_bps,signals,unknown,mean_net_pct
+development,60,588,5,-0.5665109789076135
+development,120,588,5,-1.1613381384444408
+validation,60,354,4,3.545261784376727
+validation,120,354,4,2.925837337371426
+reviewed_holdout,60,356,9,-0.45647583058401725
+reviewed_holdout,120,356,9,-1.051961238115267
