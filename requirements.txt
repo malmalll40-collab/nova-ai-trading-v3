@@ -8,3 +8,4 @@ exchange-calendars>=4.8,<5
 psycopg[binary]>=3.2,<4
 cryptography>=42,<50
 websockets>=13,<18
+PyJWT[crypto]>=2.10,<3
