@@ -1,0 +1,40 @@
+name: NOVA forward seed integration
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - research_forward_seed.py
+      - research_forward_seed_api.py
+      - integration_checks/forward_seed_postgres.py
+      - .github/workflows/forward-seed-integration.yml
+      - server.py
+permissions:
+  contents: read
+jobs:
+  isolated-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nova_ci
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: nova_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nova_ci -d nova_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PYTHONPATH: "."
+      NOVA_TEST_POSTGRES_DSN: postgresql://nova_ci:local_ci_only@127.0.0.1:5432/nova_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "psycopg[binary]>=3.2,<4" "fastapi>=0.115,<1" httpx
+      - run: python integration_checks/forward_seed_postgres.py

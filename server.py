@@ -110,6 +110,8 @@ async def _app_lifespan(application):
 
 app = FastAPI(title='NOVA AI Trading Mobile', docs_url=None, redoc_url=None, openapi_url=None, lifespan=_app_lifespan)
 app.mount('/static', StaticFiles(directory=ASSETS), name='static')
+from research_forward_seed_api import router as forward_seed_router
+app.include_router(forward_seed_router)
 CACHE_LOCK = threading.Lock()
 # Exact-key locks coalesce identical requests without unrelated hash collisions.
 # Reference counts include waiters; the registry is bounded by active requests.
