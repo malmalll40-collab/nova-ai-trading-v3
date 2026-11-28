@@ -1,0 +1,43 @@
+{
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "replay_sha256": "925d74dfb55aaae43e0e9a436e3d2830770f2e072de8e8c1ebcca4b0f48939f1",
+  "metrics_sha256": "a9181b046a674a88aa0292ed262e0e9d6bcee28409850df96dc6d32e7d237f97",
+  "edges_sha256": "85232adc305365c34cf025a74e18664001a8d743a0c0f3951a1dbc39c760f3ec",
+  "source_cohort": 966400,
+  "comparisons": 192,
+  "metrics_rows": 8,
+  "edge_rows": 6238,
+  "fold_edges": [
+    1338,
+    1614,
+    1632,
+    1654
+  ],
+  "scope300_eligible": 89149,
+  "scope300_covered": 67780,
+  "local_tests_passed": 3,
+  "scope300_mean_score_auc": {
+    "static": 0.483496,
+    "lead": 0.495125,
+    "blend": 0.479543
+  },
+  "scope300_return_120bps_full_loss": {
+    "liquidity": -6.13709,
+    "static": -13.301314,
+    "lead": -21.026159,
+    "blend": -11.82321,
+    "matched_liquidity": -5.585638,
+    "matched_static": -10.430438
+  },
+  "scope300_return_120bps_principal_recovery": {
+    "liquidity": 1.36291,
+    "static": -8.516914,
+    "lead": -10.724799,
+    "blend": -1.84443,
+    "matched_liquidity": -0.585638,
+    "matched_static": -7.651733
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Frozen training-only directed correlations on five-session past returns versus next-open to fifth-session close gross returns, median residualization across eligible symbols, clipped inputs, overlapping observations, many pair comparisons without multiple testing correction. Edges across folds can repeat. Score AUC on known covered samples, not calibrated probability or causal evidence. Prior reviewed folds, not independent forward evaluation. Blend uses equal percentile weights, missing lead fallback to static rank; no explicit sector relationships or investor flows. 5-Core integration not replayed in this experiment. Latest CI unverified."
+}
