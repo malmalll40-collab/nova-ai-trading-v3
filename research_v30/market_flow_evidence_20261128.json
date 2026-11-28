@@ -1,0 +1,46 @@
+{
+  "cohort": 966400,
+  "comparisons": 12,
+  "cache_sha256": "db4e78cbf124701be438500dd78810250a39e52ef2bb5a2dd545e8366141032c",
+  "actual_industry_mapping_available": false,
+  "investor_flow_available": false,
+  "features": [
+    "market_turnover_share",
+    "share_change5",
+    "market_breadth",
+    "breadth_change5",
+    "market_turnover_ratio"
+  ],
+  "validation_60bps": {
+    "liquidity": {
+      "precision": 0.09322,
+      "mean_net_pct": -0.119337,
+      "loss5": 0.014124
+    },
+    "base": {
+      "precision": 0.112994,
+      "mean_net_pct": -0.980321,
+      "loss5": 0.127119,
+      "auc": 0.710699
+    },
+    "market_flow": {
+      "signals": 354,
+      "known": 353,
+      "unknown": 1,
+      "precision": 0.200565,
+      "mean_net_pct": -1.223621,
+      "loss5": 0.240793,
+      "auc": 0.713244,
+      "conservative_daily": -1.50265
+    }
+  },
+  "development_market_flow_60bps": {
+    "mean_net_pct": -0.775745
+  },
+  "validation_market_flow_120bps": {
+    "mean_net_pct": -1.814517
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Market turnover and breadth are activity proxies, not actual net money flows. Raw KRX SECT_TP_NM is KOSDAQ listing division, not industry classification; KOSPI field missing. Inspected six archived xlsx files, none contain investor-type flow or dated industry mappings. No prospective evidence; latest CI pending."
+}
