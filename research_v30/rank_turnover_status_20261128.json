@@ -1,0 +1,31 @@
+{
+  "raw_rows": 1995617,
+  "raw_codes": 2997,
+  "market_days": 729,
+  "eligible_before_safe": 1375361,
+  "safe_rows": 1314210,
+  "safe_codes": 2847,
+  "unknown": 2907,
+  "phase_counts": {
+    "development": 622401,
+    "reviewed_holdout": 317390,
+    "validation": 374419
+  },
+  "added_features": 11,
+  "loader": "PASS",
+  "local_synthetic_smoke": {
+    "status": "PASS",
+    "rows": 20,
+    "checks": [
+      "daily top-two cap",
+      "known plus unknown equals signals",
+      "all five strategies represented"
+    ],
+    "reduced_estimators": 5
+  },
+  "full_fit": "TIMEOUT",
+  "comparison_results": null,
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Real-data loader completed with all four source hashes verified. Four-model real-data fit timed out before results were written. Common feature-complete cohort count and performance not yet measured. Synthetic smoke is not predictive validation. No independent future results; no production changes."
+}
