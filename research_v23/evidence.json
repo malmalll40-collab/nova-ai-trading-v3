@@ -1,0 +1,66 @@
+{
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "eligible": 47603,
+  "known": 46946,
+  "training_rows": 21873,
+  "features": 21,
+  "metrics_rounded": {
+    "validation": {
+      "linear": {
+        "auc": 0.488826,
+        "brier": 0.273712,
+        "baseline": 0.252712
+      },
+      "tree": {
+        "auc": 0.507655,
+        "brier": 0.258964,
+        "baseline": 0.252712
+      },
+      "risk": {
+        "auc": 0.630538,
+        "brier": 0.153237,
+        "baseline": 0.153185
+      }
+    },
+    "reviewed_holdout": {
+      "linear": {
+        "auc": 0.523016,
+        "brier": 0.266632,
+        "baseline": 0.240718
+      },
+      "tree": {
+        "auc": 0.519276,
+        "brier": 0.272022,
+        "baseline": 0.240718
+      },
+      "risk": {
+        "auc": 0.521255,
+        "brier": 0.242807,
+        "baseline": 0.229023
+      }
+    }
+  },
+  "mean_per_signal_pct": {
+    "validation": {
+      "liquidity": 3.545262,
+      "roles13": 2.932363,
+      "core5": 2.124628,
+      "linear": 1.552575,
+      "tree": 1.124033,
+      "expected_return": 0.910606,
+      "combined": 0.879397
+    },
+    "reviewed_holdout": {
+      "liquidity": -0.456476,
+      "roles13": -1.108085,
+      "core5": -2.614551,
+      "linear": -1.19228,
+      "tree": 0.048099,
+      "expected_return": -0.762949,
+      "combined": -1.230586
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limits": "Local measured rounded results. Same previously reviewed historical sample, not independent. Brier scores conditional on resolved labels; not calibrated probabilities. Daily top-two overlapping hypothetical signals, not account performance. No live adoption."
+}
