@@ -1,0 +1,40 @@
+{
+  "cohort": 966400,
+  "gap_known": 964587,
+  "comparisons": 48,
+  "cap_pct": [
+    null,
+    0,
+    1,
+    2
+  ],
+  "validation_60bps": {
+    "liquidity": {
+      "uncapped": -0.119337,
+      "cap0": 0.20841,
+      "cap1": 0.099653,
+      "cap2": 0.045719
+    },
+    "up": {
+      "uncapped": -0.980321,
+      "cap0": -1.260018,
+      "cap1": -0.927141,
+      "cap2": -0.898733
+    },
+    "excess": {
+      "uncapped": -0.596907,
+      "cap0": -0.829304,
+      "cap1": -0.589252,
+      "cap2": -0.609074
+    }
+  },
+  "liquidity_cap0": {
+    "validation_known": 158,
+    "validation_skipped": 196,
+    "validation_120bps_mean": -0.391053,
+    "development_60bps_mean": -0.536554
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Precommitted cap proxy assumes fill at opening print when eligible, not a verified opening auction fill or order execution. No post-open decision at same opening price, no replacement candidates. Unknown attempted outcomes retained in conservative sensitivity. Historical development and repeatedly reviewed validation only, no independent prospective results or portfolio returns. No production changes; latest CI not verified."
+}
