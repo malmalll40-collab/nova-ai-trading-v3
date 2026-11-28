@@ -10,6 +10,8 @@ jobs:
     timeout-minutes: 15
     env:
       PYTHONPATH: "."
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
       NOVA_OPS_DIAGNOSTICS_ON_START: "0"
       NOVA_CORE541_EVIDENCE_ENABLED: "0"
       NOVA_CORE560_AUTO_ENABLED: "0"
@@ -21,7 +23,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install -r requirements.txt pytest httpx pytest-timeout pytest-socket
+        run: python -m pip install -r requirements.txt pytest httpx pytest-timeout pytest-socket "scikit-learn>=1.7,<2" openpyxl
       - name: Compile sources
         run: python -m compileall -q -x '/\.git/' .
       - name: Focused research tests
@@ -40,7 +42,7 @@ jobs:
           node --test tests/test_v585_pattern_ui.cjs tests/test_v586_pattern_menu.cjs tests/test_v591_chart_overlay.cjs tests/test_v601_scan_interruption.cjs
       - name: Regression tests
         run: |
-          python -m pytest --collect-only -q > /tmp/nova-test-collection.txt
+          python -m pytest --collect-only -q > /tmp/nova-test-collection.txt 2>&1 || { tail -n 100 /tmp/nova-test-collection.txt; exit 1; }
           tail -n 2 /tmp/nova-test-collection.txt
           python -m pytest -vv --durations=20 --timeout=45 --timeout-method=signal --disable-socket --allow-unix-socket --junitxml=/tmp/nova-regression.xml
       - name: Verify complete test count
