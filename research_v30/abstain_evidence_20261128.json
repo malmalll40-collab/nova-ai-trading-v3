@@ -1,0 +1,47 @@
+{
+  "cohort": 966400,
+  "eligible_signal_days": 346,
+  "comparisons": 96,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "csv_sha256": "8976a4f915212b13d5b791f61b612fc71cc977eba7489adbd54405b9ae41145a",
+  "fixed_gate": {
+    "expected_net_stress_pct_gt": 0.5,
+    "adverse5_probability_le": 0.25
+  },
+  "stress120bps": {
+    "liquidity": {
+      "trades": 144,
+      "unknown": 3,
+      "mean_fold_return_pct": -4.404859
+    },
+    "liquidity_veto": {
+      "trades": 0,
+      "mean_fold_return_pct": 0
+    },
+    "mean": {
+      "trades": 384,
+      "unknown": 3,
+      "mean_fold_return_pct": -7.475353
+    },
+    "mean_veto": {
+      "trades": 7,
+      "candidates": 10,
+      "signal_days": 10,
+      "unknown": 0,
+      "mean_fold_return_pct": -0.195012
+    },
+    "early_veto": {
+      "trades": 1,
+      "signal_days": 1,
+      "unknown": 0,
+      "mean_fold_return_pct": 0.094588
+    },
+    "cash": {
+      "trades": 0,
+      "mean_fold_return_pct": 0
+    }
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Local verified cache, prior reviewed folds, no new investor flows. Fixed policy thresholds selected for research, not calibrated probability or optimized threshold. Unknown outcomes stressed at full loss or principal recovery. Near-zero trade coverage cannot establish profitable selection; cash is an explicit baseline. No independent future validation, no daily mark-to-market, no verified fills. Latest CI unverified."
+}
