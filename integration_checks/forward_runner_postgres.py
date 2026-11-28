@@ -27,7 +27,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.dsn,'postgresql://nova_ci:local_ci_only@127.0.0.1:5432/nova_ci')
         self.tmp=tempfile.TemporaryDirectory()
         path=Path(self.tmp.name)/'fixture.sqlite'
-        days=f.CAL.sessions_window(f.pd.Timestamp(f.dayfmt(f.LAST)),-64).strftime('%Y%m%d').tolist()
+        days=f.CAL.sessions_window(f.pd.Timestamp(f.dayfmt(f.LAST)),-65).strftime('%Y%m%d').tolist()
         self.assertEqual(len(days),65)
         with sqlite3.connect(path) as db:
             db.executescript(f.SCHEMA)
