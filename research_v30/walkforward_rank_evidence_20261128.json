@@ -1,0 +1,67 @@
+{
+  "cohort": 966400,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "csv_sha256": "0cff51a60d053ee0743570f6229cfe83ab5c8d869936e159ad99a9de3b99097a",
+  "folds": [
+    [
+      "20240821",
+      "20250106",
+      10340,
+      8500
+    ],
+    [
+      "20250107",
+      "20250528",
+      19203,
+      8900
+    ],
+    [
+      "20250529",
+      "20251014",
+      28457,
+      8600
+    ],
+    [
+      "20251015",
+      "20260226",
+      36941,
+      8600
+    ]
+  ],
+  "comparisons": 64,
+  "portfolio_return_pct_60bps_total_loss_stress": {
+    "liquidity": [
+      -6.189266,
+      -19.982728,
+      14.343808,
+      2.768868
+    ],
+    "momentum": [
+      -5.778707,
+      -28.935146,
+      13.615885,
+      -34.685467
+    ],
+    "excess": [
+      -14.082751,
+      -10.663435,
+      14.200367,
+      7.478388
+    ],
+    "ranker": [
+      -8.39509,
+      -11.618134,
+      14.701334,
+      1.744273
+    ]
+  },
+  "mean_fold_return_pct_120bps_total_loss_stress": {
+    "liquidity": -4.404859,
+    "momentum": -17.754942,
+    "excess": -5.969163,
+    "ranker": -6.23641
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "All folds are previously reviewed historical data; no independent forward validation. Five-session label embargo at each test boundary; model refits once per fold, not daily. 100 daily liquidity candidates, max two selected, fixed initial capital tickets and independent fold reset. Unknown outcomes stressed at 0 or 100% principal recovery, not actual losses. No mark-to-market drawdown, real fill simulation, sector or investor-flow input. Latest CI not yet verified."
+}
