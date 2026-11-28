@@ -1,0 +1,118 @@
+{
+  "date": "2026-11-28",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "sample": "first archive session top 50 trading value per market; no future survival selection",
+  "universe": 100,
+  "eligible": 47603,
+  "known": 46946,
+  "unknown": 657,
+  "phase_counts": {
+    "development": 22196,
+    "validation": 12510,
+    "reviewed_holdout": 12897
+  },
+  "results": [
+    [
+      "development",
+      "roles13",
+      3966,
+      3907,
+      59,
+      38.90453,
+      -1.106311
+    ],
+    [
+      "development",
+      "roles10_no_reviewers",
+      2083,
+      2054,
+      29,
+      39.532619,
+      -1.165481
+    ],
+    [
+      "development",
+      "core5",
+      1158,
+      1143,
+      15,
+      42.08224,
+      -0.914352
+    ],
+    [
+      "validation",
+      "roles13",
+      4234,
+      4163,
+      71,
+      46.312755,
+      0.90899
+    ],
+    [
+      "validation",
+      "roles10_no_reviewers",
+      2346,
+      2312,
+      34,
+      46.150519,
+      0.85971
+    ],
+    [
+      "validation",
+      "core5",
+      2582,
+      2534,
+      48,
+      43.449092,
+      0.669173
+    ],
+    [
+      "reviewed_holdout",
+      "roles13",
+      2357,
+      2317,
+      40,
+      44.842469,
+      -0.066823
+    ],
+    [
+      "reviewed_holdout",
+      "roles10_no_reviewers",
+      1328,
+      1303,
+      25,
+      45.817345,
+      0.030395
+    ],
+    [
+      "reviewed_holdout",
+      "core5",
+      510,
+      493,
+      17,
+      50.912779,
+      1.212224
+    ]
+  ],
+  "columns": [
+    "phase",
+    "strategy",
+    "signals",
+    "known",
+    "unknown",
+    "win_pct",
+    "mean_net_pct"
+  ],
+  "correlations": {
+    "breakout20_channel50": 0.777689,
+    "ema12_26_ema20_50": 0.732401,
+    "rsi_momentum20": 0.733507
+  },
+  "unchanged_buy_ablation": [
+    "bollinger",
+    "channel50"
+  ],
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limits": "Measured using local vectorized replica, not final financial/notification-filtered live recommendation. Common clean segments, prior completed index session, 65-bar warmup, next open to fifth close, 30bps per side. Unknown retained. Same reviewed historical sample; overlapping signals not account return. Repository synthetic parity pending. No independent future verification."
+}
