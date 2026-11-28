@@ -1,0 +1,52 @@
+{
+  "source_cohort": 966400,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "search_sha256": "f8048e06126c9e1987c3f3cba286aac181f4966c0252321917c88d9084056cd7",
+  "replay_sha256": "74b55d5447dffec854d2fd802ff0264e98ce270023a94d08f6c7e6db807e0d00",
+  "choices_sha256": "b37b80b5f3e6b0d9b96838b8809dcfc33317261d3abc28cfe3b2e239b565c909",
+  "generated": 48,
+  "search_rows": 192,
+  "outer_rows": 48,
+  "passing": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "local_assertions_passed": 5,
+  "outer_returns_120bps_full_loss": {
+    "liquidity": [
+      -8.186175,
+      -22.13641,
+      5.1755,
+      0.598727
+    ],
+    "generated": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "cash": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "calibration_max_returns": [
+    0.010769,
+    -0.303027,
+    0.9941,
+    3.163066
+  ],
+  "calibration_baselines": [
+    -2.688403,
+    -3.537661,
+    -13.250502,
+    3.012653
+  ],
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Previously reviewed folds, not independent prospective evaluation. Fixed finite menu, 50-session calibration with 5-session embargo, fixed 5-session training labels for both 3- and 5-session holds; minimum 12 trades, unknown fraction <=5%, stress return > max(cash,liquidity)+1 percentage point. No dynamic stops, gap-open filters, live fills, actual NOVA signal history or investor flow. Cash fallback zero return is not evidence of predictive skill. Latest CI unverified."
+}
