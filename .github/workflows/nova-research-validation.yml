@@ -51,9 +51,9 @@ jobs:
           import xml.etree.ElementTree as ET
           root = ET.parse('/tmp/nova-regression.xml').getroot()
           cases = list(root.iter('testcase'))
-          assert len(cases) == 1095, f'Expected 1095 cases, got {len(cases)}'
+          assert len(cases) == 1100, f'Expected 1100 cases, got {len(cases)}'
           assert not any(c.find(k) is not None for c in cases for k in ('failure','error','skipped'))
-          print('All 1095 regression cases passed without skips')
+          print('All 1100 regression cases passed without skips')
           PY
       - name: Verify Render archive overlay
         if: always()
