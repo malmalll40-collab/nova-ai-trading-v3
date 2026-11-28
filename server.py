@@ -76,6 +76,17 @@ async def _app_lifespan(application):
         _ops_startup()
     except Exception:
         logging.getLogger('uvicorn.error').warning('NOVA_OPS startup diagnostic failed; service remains available')
+    if os.getenv('NOVA_FORWARD_VERIFY_ON_START')=='1':
+        def verify_forward_seed():
+            from ops_diagnostics import emit
+            try:
+                from research_forward_restore import verify
+                emit('forward_seed_restore',verify(os.getenv('DATABASE_URL','').strip()))
+            except Exception as exc:
+                from research_forward_seed import SeedError
+                reason=str(exc) if isinstance(exc,SeedError) else 'RESTORE_UNAVAILABLE'
+                emit('forward_seed_restore',{'status':'BLOCKED','reason':reason,'orders_enabled':False})
+        threading.Thread(target=verify_forward_seed,daemon=True,name='nova-forward-seed-verify').start()
     stop_preflight = threading.Event()
     # Explicit owner-authorized rollout only; disabled by default.
     if os.getenv('NOVA_RESEARCH_ACTIVATION')=='1':
