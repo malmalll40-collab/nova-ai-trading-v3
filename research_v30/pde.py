@@ -6,12 +6,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeRegressor
-try:
-    from research_v30.regime_portfolio import portfolio
-    from research_v30.walkforward_rank import FOLDS
-except ModuleNotFoundError:
-    from regime_portfolio import portfolio
-    from walkforward_rank import FOLDS
 H=5
 FEATURES=['ret5','ret20','relative20','vol20','turnover_log','turnover_ratio','compression','range_position','distance_high','close_location','turnover_ratio5','turnover_ratio10','turnover_ratio20','rank_ret5','rank_ret5_change5','rank_relative20','rank_relative20_change5','rank_turnover_ratio','rank_turnover_ratio_change5','rank_turnover_log','rank_turnover_log_change5']
 OBJECTIVES=('rise','return','risk_adjusted')
@@ -45,6 +39,8 @@ def discover(train,cal,test):
     return records,score,votes
 
 def compare(q,days):
+    from research_v30.regime_portfolio import portfolio
+    from research_v30.walkforward_rank import FOLDS
     if q.duplicated(['day','code']).any():raise ValueError('duplicate symbol/day')
     q=q.sort_values(['day','turnover_log','code'],ascending=[True,False,True]).groupby('day').head(100).copy();q['seq']=q.day.map(dict(zip(days,range(len(days)))))
     if not np.isfinite(q[FEATURES]).all().all():
