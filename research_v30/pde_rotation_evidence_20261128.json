@@ -1,0 +1,72 @@
+{
+  "source_cohort": 966400,
+  "matched_rows": 115729,
+  "matched_symbols": 993,
+  "features": 47,
+  "comparisons": 224,
+  "classification_comparisons": 16,
+  "local_tests_passed": 3,
+  "cache_sha256": "af57d58f8438865d6613d817e7e64d90d08675d160a15947573c5a16833cde5c",
+  "source_sha256": "b3b081c4a934535fa76eef96f88d1960122d74227af01d4e90bdc19835910753",
+  "replay_sha256": "bbabbd9f60ed21618bb3102a0770e51a14d8178e98c3f80c43d1b72e350b30e7",
+  "metrics_sha256": "21100e148904b3ed8ee2d083334d2167d97efbd743cd5a284aaa305f7e13eb4a",
+  "scope300_mean_return_120bps_full_loss": {
+    "core": 1.03124,
+    "liquidity": -6.13709,
+    "static": -13.301314,
+    "rotation": -5.649702,
+    "fill_liquidity": -3.858159,
+    "fill_static": -8.525281,
+    "fill_rotation": -2.996461
+  },
+  "scope300_mean_return_120bps_principal_recovery": {
+    "core": 3.53124,
+    "fill_rotation": 1.962262,
+    "fill_static": -3.902981
+  },
+  "scope300_candidates": {
+    "core": {
+      "total": 346,
+      "clean": 114,
+      "trades": 158
+    },
+    "fill_rotation": {
+      "total": 662,
+      "clean": 152,
+      "trades": 330
+    },
+    "fill_static": {
+      "total": 662,
+      "clean": 156,
+      "trades": 334
+    },
+    "fill_liquidity": {
+      "total": 662,
+      "clean": 183,
+      "trades": 222
+    }
+  },
+  "scope300_mean_noncore_auc": {
+    "static": [
+      0.557735,
+      0.657623
+    ],
+    "rotation": [
+      0.555219,
+      0.638857
+    ]
+  },
+  "scope100_mean_noncore_auc": {
+    "static": [
+      0.535612,
+      0.657595
+    ],
+    "rotation": [
+      0.551965,
+      0.641502
+    ]
+  },
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Previously reviewed folds only. Reconstructed research 5-Core not live signals. Turnover concentration uses sum of 20-day median turnover proxies, not actual capital flows. Breadth computed on eligible research universe, no verified sector or lead-lag graph. Filling vacant daily candidate slots preserves candidate identity, not executed trades because capital and positions interact. Same retrospective fold dates and known outcomes; no independent prospective data or fills. No investor flow inputs. New CI unverified."
+}
