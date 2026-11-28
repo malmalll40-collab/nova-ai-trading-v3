@@ -44,3 +44,4 @@ jobs:
         with:
           node-version: '22'
       - run: node --check static/forward_shadow.js && node --check static/sw.js
+      - run: python integration_checks/history_archive_postgres.py

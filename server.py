@@ -151,6 +151,8 @@ from forward_shadow.api import router as forward_run_router
 app.include_router(forward_run_router)
 from forward_shadow.scheduler import router as forward_scheduler_router, install_snapshot as install_forward_snapshot
 app.include_router(forward_scheduler_router)
+from research_krx_archive_api import router as history_archive_router
+app.include_router(history_archive_router)
 CACHE_LOCK = threading.Lock()
 # Exact-key locks coalesce identical requests without unrelated hash collisions.
 # Reference counts include waiters; the registry is bounded by active requests.
