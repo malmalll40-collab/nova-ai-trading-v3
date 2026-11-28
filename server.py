@@ -87,6 +87,25 @@ async def _app_lifespan(application):
                 reason=str(exc) if isinstance(exc,SeedError) else 'RESTORE_UNAVAILABLE'
                 emit('forward_seed_restore',{'status':'BLOCKED','reason':reason,'orders_enabled':False})
         threading.Thread(target=verify_forward_seed,daemon=True,name='nova-forward-seed-verify').start()
+    if os.getenv('NOVA_FORWARD_DASHBOARD_PROBE')=='1':
+        def probe_forward_dashboard():
+            from ops_diagnostics import emit
+            try:
+                from forward_shadow.dashboard import get
+                from forward_shadow.api import lock
+                if not lock.acquire(blocking=False):
+                    emit('forward_dashboard_probe',{'status':'BUSY','orders_enabled':False});return
+                try:
+                    data=get(os.getenv('DATABASE_URL','').strip())
+                finally:lock.release()
+                fields=('status','revision','total_bars','total_sessions','market_bars','last_day',
+                        'next_session','prospective_sessions','late_bridge_sessions','closed_assumed',
+                        'win_rate_pct','equity_frozen_mark','return_pct','mdd_pct','collection_status',
+                        'unresolved_calls','completed_response_claims','schedule_configured','orders_enabled')
+                emit('forward_dashboard_probe',{k:data[k] for k in fields})
+            except Exception:
+                emit('forward_dashboard_probe',{'status':'UNAVAILABLE','orders_enabled':False})
+        threading.Thread(target=probe_forward_dashboard,daemon=True,name='nova-forward-dashboard-probe').start()
     stop_preflight = threading.Event()
     install_forward_snapshot(_ops_preflight_snapshot)
     if os.getenv('NOVA_FORWARD_BRIDGE_ON_START')=='1':
@@ -2373,7 +2392,13 @@ def forward_performance(request:Request):
     _authorize(request);_limit(request)
     try:
         from forward_shadow.dashboard import get
-        return JSONResponse(get(os.getenv('DATABASE_URL','').strip()),headers={'Cache-Control':'no-store'})
+        from forward_shadow.api import lock
+        if not lock.acquire(blocking=False):
+            raise HTTPException(409,'수집 작업 중 · 잠시 후 조회하세요')
+        try:
+            return JSONResponse(get(os.getenv('DATABASE_URL','').strip()),headers={'Cache-Control':'no-store'})
+        finally:lock.release()
+    except HTTPException:raise
     except Exception:
         raise HTTPException(503,'모의투자 기록 조회 불가 또는 검증 실패') from None
 

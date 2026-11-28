@@ -82,6 +82,73 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'LOCAL_ADMISSION_BLOCKED'):
             r.run(self.store,'fixture',clock=lambda:datetime.fromisoformat('2026-11-28T14:00:00+09:00'),fetch=self.fetch,pause=lambda _:None,admit=lambda:False)
         self.assertEqual(len(self.calls),0)
+    def test_dashboard_bridge_actual_postgres(self):
+        from forward_shadow import dashboard
+        with patch.object(f,'now',return_value=datetime.fromisoformat('2026-11-28T14:00:00+09:00')):
+            for _ in range(2):self.run_at('2026-11-28T14:00:00+09:00')
+            report=dashboard.read(self.dsn)
+        self.assertEqual(report['total_bars'],134)
+        self.assertEqual(report['total_sessions'],67)
+        self.assertEqual(report['revision'],2)
+        self.assertEqual(report['completed_response_claims'],8)
+        self.assertEqual(report['unresolved_calls'],0)
+        self.assertEqual(report['collection_status'],'CURRENT')
+        self.assertEqual(report['prospective_sessions'],0)
+        self.assertIsNone(report['win_rate_pct'])
+        self.assertEqual(report['equity_frozen_mark'],10000000)
+        self.assertEqual(report['validation_status'],'INSUFFICIENT_EVIDENCE')
+        self.assertFalse(report['orders_enabled'])
+        with psycopg.connect(self.dsn) as db:
+            self.assertEqual(db.execute(f'SELECT revision,owner FROM {r.NS}.checkpoint WHERE id=%s',(r.KEY,)).fetchone(),(2,None))
+    def test_dashboard_blocks_missing_response(self):
+        from forward_shadow import dashboard
+        self.run_at('2026-11-28T14:00:00+09:00')
+        with psycopg.connect(self.dsn) as db:
+            db.execute(f'DELETE FROM {r.NS}.response WHERE id=%s AND service=%s',(r.KEY,next(iter(c.SERVICES))))
+        with self.assertRaisesRegex(ValueError,'RESPONSE_LEDGER_MISMATCH'):dashboard.read(self.dsn)
+    def test_dashboard_reports_uncertain_without_writing(self):
+        from forward_shadow import dashboard
+        self.store.acquire('fixture')
+        self.store.begin('fixture','20261126',next(iter(c.SERVICES)))
+        self.store.release('fixture')
+        report=dashboard.read(self.dsn)
+        self.assertEqual(report['collection_status'],'BLOCKED_UNCERTAIN')
+        self.assertEqual(report['unresolved_calls'],1)
+        self.assertEqual(report['revision'],0)
+    def test_dashboard_closed_loss_and_positions(self):
+        from forward_shadow import dashboard
+        self.run_at('2026-11-28T14:00:00+09:00')
+        self.run_at('2026-11-28T14:00:00+09:00')
+        self.run_at('2026-11-30T19:00:00+09:00')
+        self.run_at('2026-12-01T19:00:00+09:00')
+        a=dashboard.read(self.dsn)
+        self.assertEqual(a['open_positions'],2)
+        self.assertEqual(len(a['positions']),2)
+        self.assertEqual(a['positions'][0]['entry_day'],'20261201')
+        self.assertIsNone(a['win_rate_pct'])
+        for day in ('02','03','04','07'):self.run_at(f'2026-12-{day}T19:00:00+09:00')
+        b=dashboard.read(self.dsn)
+        self.assertGreater(b['closed_assumed'],0)
+        self.assertEqual(b['win_rate_pct'],0)
+        self.assertLess(b['mean_closed_return_pct'],0)
+        self.assertLess(b['return_pct'],0)
+        self.assertLess(b['mdd_pct'],0)
+        self.assertEqual(b['strategy_adoption'],'HOLD')
+    def test_dashboard_cache_and_no_stale_fallback(self):
+        from forward_shadow import dashboard
+        with patch.object(dashboard,'_cached',None):
+            now=[0]
+            calls=[]
+            def read(dsn):
+                calls.append(dsn)
+                if len(calls)>1:raise ValueError('offline')
+                return {'status':'VERIFIED','revision':0}
+            self.assertFalse(dashboard.get('fixture',read_fn=read,clock=lambda:now[0])['cached'])
+            now[0]=10
+            self.assertTrue(dashboard.get('fixture',read_fn=read,clock=lambda:now[0])['cached'])
+            now[0]=30
+            with self.assertRaisesRegex(ValueError,'offline'):dashboard.get('fixture',read_fn=read,clock=lambda:now[0])
+            self.assertIsNone(dashboard._cached)
     def test_owner_exclusion(self):
         self.store.acquire('first')
         other=r.Store(self.dsn)
