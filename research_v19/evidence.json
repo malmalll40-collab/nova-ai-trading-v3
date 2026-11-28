@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-28",
+  "raw_rows": 1995617,
+  "parity_rows": 18,
+  "ratio_candidates": 398,
+  "confirmed_events": 3,
+  "confirmed_disclosures": [
+    {
+      "day": "20241120",
+      "codes": [
+        "003920",
+        "003925"
+      ],
+      "ratio": 10,
+      "url": "https://kind.krx.co.kr/external/2024/11/15/000107/20241115000180/68155.htm"
+    },
+    {
+      "day": "20260413",
+      "codes": [
+        "010120"
+      ],
+      "ratio": 5,
+      "url": "https://kind.krx.co.kr/external/2026/04/10/000814/20260410001941/68155.htm"
+    }
+  ],
+  "reviewed_holdout": {
+    "liquidity": {
+      "return_pct": 4.2743875,
+      "exposure_matched_index_pct": 1.073,
+      "entries": 48,
+      "unique_symbols": 9,
+      "top2_entry_pct": 75,
+      "top2_positive_pnl_pct": 79.982,
+      "realized_pnl_ex_top2_krw": -824775.8
+    },
+    "trend_only": {
+      "return_pct": 2.073196,
+      "exposure_matched_index_pct": 1.002,
+      "top2_entry_pct": 66.667
+    },
+    "avoid_down_shock": {
+      "return_pct": 3.131396,
+      "exposure_matched_index_pct": 1.301,
+      "top2_entry_pct": 68.75
+    }
+  },
+  "notes": "Private local replay; comparison rounded. Same reviewed history, not independent. Confirmed disclosure samples do not verify adjusted price series. Benchmarks omit dividends/costs; exposure matched proxy is not tradable replication. No production adoption or training readiness.",
+  "adoption": "HOLD",
+  "orders_enabled": false
+}
