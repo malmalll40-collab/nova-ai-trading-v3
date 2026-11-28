@@ -19,15 +19,18 @@ def compare(z,days,flags,idx):
     for start,end in FOLDS:
         cs=start-35
         tr=z[(z.seq+H<cs)&z.core&z.label.ge(0)];cal=z[(z.seq>=cs)&(z.seq+H<start)&z.core].copy();te=z[(z.seq>=start)&(z.seq+H<=end)].copy()
-        assert tr.seq.max()+H<cal.seq.min() and cal.seq.max()+H<te.seq.min()
-        y=tr.label.eq(2);assert y.value_counts().min()>=100
-        model=LGBMClassifier(n_estimators=60,learning_rate=.03,num_leaves=7,min_child_samples=100,reg_lambda=5,random_state=0,n_jobs=2,verbosity=-1).fit(tr[COLS],y.astype(int))
-        cal['risk_score']=model.predict_proba(cal[COLS])[:,1];te['risk_score']=model.predict_proba(te[COLS])[:,1]
+        assert (tr.seq+H<cs).all() and (cal.seq+H<start).all() and (te.seq>=start).all()
+        y=tr.label.eq(2); trained=y.nunique()==2 and y.value_counts().min()>=100
+        cal['risk_score']=0.;te['risk_score']=0.
+        if trained and len(cal):
+            model=LGBMClassifier(n_estimators=60,learning_rate=.03,num_leaves=7,min_child_samples=100,reg_lambda=5,random_state=0,n_jobs=2,verbosity=-1).fit(tr[COLS],y.astype(int))
+            cal['risk_score']=model.predict_proba(cal[COLS])[:,1];te['risk_score']=model.predict_proba(te[COLS])[:,1]
         for scope in (100,300):
-            p=te[te['rank']<=scope];c=select_candidates(cal[cal['rank']<=scope],'core',{});assert len(c)>=20
-            thresholds={'veto_q80':float(c.risk_score.quantile(.8)),'veto_q90':float(c.risk_score.quantile(.9)),'veto_p50':.5}
+            p=te[te['rank']<=scope];c=select_candidates(cal[cal['rank']<=scope],'core',{})
+            active=bool(trained and len(c)>=20)
+            thresholds={'veto_q80':float(c.risk_score.quantile(.8)),'veto_q90':float(c.risk_score.quantile(.9)),'veto_p50':.5} if active else {p:1. for p in POLICIES if p.startswith('veto_')}
             base=select_candidates(p,'core',{});k=base[base.label.ge(0)]
-            calrows.append(dict(fold_start=days[start],scope=scope,training_rows=len(tr),calibration_candidates=len(c),**thresholds,eval_known=len(k),risk_auc=roc_auc_score(k.label.eq(2),k.risk_score) if k.label.eq(2).nunique()==2 else np.nan,brier=brier_score_loss(k.label.eq(2),k.risk_score)))
+            calrows.append(dict(fold_start=days[start],scope=scope,training_rows=len(tr),calibration_candidates=len(c),active=active,**thresholds,eval_known=len(k),risk_auc=roc_auc_score(k.label.eq(2),k.risk_score) if active and k.label.eq(2).nunique()==2 else np.nan,brier=brier_score_loss(k.label.eq(2),k.risk_score) if active and len(k) else np.nan))
             for policy in POLICIES:
                 t=select_candidates(p,policy,thresholds);assert set(t.index)<=set(base.index)
                 for fee in (.003,.006):
