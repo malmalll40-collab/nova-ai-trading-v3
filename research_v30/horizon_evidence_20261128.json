@@ -1,0 +1,73 @@
+{
+  "cohort": 966400,
+  "development": 599299,
+  "validation": 367101,
+  "known": {
+    "development": {
+      "1": 598225,
+      "3": 596102,
+      "5": 593990
+    },
+    "validation": {
+      "1": 366362,
+      "3": 364882,
+      "5": 363390
+    }
+  },
+  "comparisons": 48,
+  "validation_60bps": {
+    "liquidity": {
+      "1": -0.119337,
+      "3": 1.77506,
+      "5": 3.679796
+    },
+    "up": {
+      "1": -0.980321,
+      "3": 0.150912,
+      "5": 0.596007
+    },
+    "mean": {
+      "1": -0.678844,
+      "3": 0.40148,
+      "5": 0.819139
+    },
+    "joint": {
+      "1": -0.69457,
+      "3": 0.575445,
+      "5": 0.825554
+    }
+  },
+  "validation_5day_60bps": {
+    "liquidity": {
+      "precision": 0.474576,
+      "adverse5": 0.217143,
+      "known": 350,
+      "unknown": 4
+    },
+    "up": {
+      "precision": 0.293785,
+      "adverse5": 0.407932,
+      "known": 353,
+      "unknown": 1
+    },
+    "mean": {
+      "precision": 0.299435,
+      "adverse5": 0.407932,
+      "known": 353,
+      "unknown": 1
+    },
+    "joint": {
+      "precision": 0.288136,
+      "adverse5": 0.391429,
+      "known": 350,
+      "unknown": 4
+    }
+  },
+  "development_5day_60bps_liquidity": -0.461364,
+  "validation_5day_120bps_liquidity": 3.059567,
+  "validation_5day_120bps_mean": 0.216022,
+  "validation_5day_120bps_mean_unknown_penalty": -0.067074,
+  "adoption": "HOLD",
+  "orders_enabled": false,
+  "limitations": "Actual local run using verified prior cache and raw archive. Code registered with package import in place of local import. Repeated historical validation, not independent prospective test; overlapping trades not portfolio return. Conservative -100% unknown outcome stress is not an estimated realized loss. Intraday low is adverse excursion, not stop-loss execution. No investor flow or industry inputs. Newly committed CI not verified."
+}
